@@ -16,7 +16,7 @@ st.set_page_config(
     page_title="ANITS Soil Lab",
     page_icon="🏗️",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="auto"
 )
 
 # --------------------------
@@ -526,6 +526,61 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
     .auth-card { padding: 24px 20px !important; }
     div[data-testid="stLinkButton"] > a { font-size: 0.75rem !important; padding: 0.4rem !important; }
 }
+
+/* ══ SIDEBAR MOBILE — always visible, proper toggle ══ */
+@media (max-width: 768px) {
+    section[data-testid="stSidebar"] {
+        position: fixed !important;
+        left: 0 !important;
+        top: 0 !important;
+        z-index: 999 !important;
+        width: 80vw !important;
+        max-width: 300px !important;
+        transform: translateX(0) !important;
+    }
+    section[data-testid="stSidebar"][aria-expanded="false"] {
+        transform: translateX(-100%) !important;
+    }
+    section.main {
+        width: 100% !important;
+        margin-left: 0 !important;
+    }
+}
+
+/* ══ EXPANDER FIX — clear text, proper icon ══ */
+div[data-testid="stExpander"] {
+    background: rgba(0,20,60,0.45) !important;
+    border: 1px solid rgba(0,100,200,0.28) !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+}
+div[data-testid="stExpander"] summary {
+    color: rgba(205,228,255,0.95) !important;
+    font-weight: 600 !important;
+    font-size: 0.9rem !important;
+    padding: 12px 16px !important;
+    list-style: none !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    background: rgba(0,40,100,0.35) !important;
+}
+div[data-testid="stExpander"] summary::-webkit-details-marker { display: none !important; }
+div[data-testid="stExpander"] summary::marker { display: none !important; }
+div[data-testid="stExpander"] > div {
+    padding: 12px 16px !important;
+    color: rgba(205,228,255,0.9) !important;
+}
+
+/* ══ PAGE TRANSITION — prevent flash ══ */
+.stApp {
+    animation: fadeIn 0.3s ease-in-out !important;
+}
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
 .stDeployButton { display: none; }
 
 /* ══════════════════════
@@ -926,6 +981,7 @@ if not st.session_state.app_started:
             st.session_state.app_started = True
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
+    st.stop()  # ← prevent any other screen from flashing below
 
 
 # ==========================
@@ -933,7 +989,7 @@ if not st.session_state.app_started:
 # ==========================
 elif not st.session_state.logged_in:
 
-    st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:30px'></div>", unsafe_allow_html=True)
 
     # Use columns to center the form
     _, mid, _ = st.columns([1, 2, 1])
@@ -1024,6 +1080,8 @@ elif not st.session_state.logged_in:
             if st.button("🔐  Sign In Instead", use_container_width=True, key="goto_login"):
                 st.session_state.auth_screen = "login"
                 st.rerun()
+
+    st.stop()  # ← prevent main app from flashing below auth screen
 
 
 # ==========================
