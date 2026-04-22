@@ -5,4 +5,4 @@ numpy
 openpyxl
 xlsxwriter
 python-docx
-Pillow==10.4.0
+Pillow
