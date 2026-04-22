@@ -397,6 +397,9 @@ def logo_html(size=110, radius=20):
     return f'<div style="font-size:{int(size*0.35)}px;margin-bottom:18px;filter:drop-shadow(0 0 16px rgba(0,160,255,0.5));text-align:center;">🏛️</div>'
 
 
+
+
+
 # ==========================
 # CSS
 # ==========================
@@ -407,8 +410,22 @@ st.markdown("""
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 * { font-family: 'Sora', sans-serif !important; }
 
-html, body { background: #03050f; }
-.stApp { background: #03050f; min-height: 100vh; }
+/* ══ ROOT — fixed height viewport, children scroll independently ══ */
+html, body {
+    height: 100% !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    background: #03050f !important;
+}
+
+/* ══ APP CONTAINER — full height, flex row ══ */
+.stApp {
+    background: #03050f !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    display: flex !important;
+}
 .stApp::before {
     content: ''; position: fixed; top: -50%; left: -50%;
     width: 200%; height: 200%;
@@ -421,13 +438,94 @@ html, body { background: #03050f; }
 }
 @keyframes bgPulse { 0%{transform:scale(1) rotate(0deg)} 100%{transform:scale(1.08) rotate(3deg)} }
 
+/* ══ SIDEBAR — fixed height, scrolls independently ══ */
+section[data-testid="stSidebar"] {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    background: rgba(4,10,28,0.97) !important;
+    border-right: 1px solid rgba(0,100,200,0.22) !important;
+    backdrop-filter: blur(20px) !important;
+    flex-shrink: 0 !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 100 !important;
+}
+section[data-testid="stSidebar"] * { color: rgba(210,232,255,0.92) !important; }
+section[data-testid="stSidebar"] > div {
+    height: 100% !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding-bottom: 30px !important;
+}
+
+/* ══ MAIN CONTENT — fills remaining space, scrolls independently ══ */
+section.main,
+.main,
+div[data-testid="stAppViewContainer"] > section.main {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    flex: 1 !important;
+    overscroll-behavior: contain !important;
+}
+
+/* ══ INNER CONTENT — natural height, no restrictions ══ */
+section.main > div,
+.main > div,
+.block-container,
+div[data-testid="stAppViewBlockContainer"],
+div[data-testid="stVerticalBlock"],
+div[data-testid="stVerticalBlockBorderWrapper"] {
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+}
+
 .main .block-container {
     position: relative; z-index: 1;
-    padding-top: 2rem !important;
-    padding-bottom: 2rem !important;
-    max-width: 100% !important;
+    padding-top: 1.5rem !important;
+    padding-bottom: 5rem !important;
+    max-width: 1200px !important;
+    width: 100% !important;
 }
+
 #MainMenu, footer, header { visibility: hidden; }
+.stDeployButton { display: none; }
+
+/* ══ MOBILE BACK BUTTON ══ */
+.mobile-back-btn {
+    position: fixed; bottom: 20px; left: 50%;
+    transform: translateX(-50%); z-index: 9999;
+    background: linear-gradient(135deg, rgba(0,100,255,0.95), rgba(0,60,200,1));
+    color: #fff !important; border: 2px solid rgba(0,200,255,0.5);
+    border-radius: 50px; padding: 12px 32px;
+    font-size: 1rem; font-weight: 800;
+    box-shadow: 0 6px 28px rgba(0,100,255,0.5);
+    cursor: pointer; display: flex; align-items: center;
+    gap: 8px; white-space: nowrap; transition: all 0.2s ease;
+}
+
+/* ══ MOBILE RESPONSIVE ══ */
+@media (max-width: 768px) {
+    .main .block-container {
+        padding-left: 0.8rem !important;
+        padding-right: 0.8rem !important;
+        padding-bottom: 80px !important;
+    }
+    .header-banner h2 { font-size: 1rem !important; }
+    .header-banner p  { font-size: 0.72rem !important; }
+    .feat-grid { grid-template-columns: repeat(2,1fr) !important; }
+    .metric-row { flex-direction: column !important; }
+    .welcome-h1 { font-size: 1.6rem !important; }
+    .auth-card { padding: 24px 20px !important; }
+    div[data-testid="stLinkButton"] > a { font-size: 0.75rem !important; padding: 0.4rem !important; }
+}
 .stDeployButton { display: none; }
 
 /* ══════════════════════
@@ -436,7 +534,8 @@ html, body { background: #03050f; }
 .welcome-wrap {
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    text-align: center; padding: 40px 20px; min-height: 80vh;
+    text-align: center; padding: 30px 20px 20px 20px;
+    min-height: auto;
 }
 .welcome-badge {
     display: inline-flex; align-items: center; gap: 8px;
@@ -772,9 +871,26 @@ for key, default in {
     "view_mode": "test",
     "last_result": None,
     "last_test_name": None,
+    "page_history": [],
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
+
+
+# --------------------------
+# BACK BUTTON HELPER
+# --------------------------
+def show_back_button():
+    """Show a back button if there is navigation history."""
+    if len(st.session_state.page_history) > 0:
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("⬅️  Back to Previous Page", key="back_btn_main", use_container_width=True):
+                prev = st.session_state.page_history.pop()
+                st.session_state.view_mode = prev
+                st.rerun()
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
 
 # ==========================
@@ -817,80 +933,97 @@ if not st.session_state.app_started:
 # ==========================
 elif not st.session_state.logged_in:
 
-    # Centered auth card — no fixed positioning, no nested columns trick
-    st.markdown('<div class="auth-page-wrap">', unsafe_allow_html=True)
-    st.markdown('<div class="auth-card">', unsafe_allow_html=True)
+    st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
 
-    # Logo
-    if _LOGO:
-        st.markdown(
-            f'<div class="auth-logo-wrap">'
-            f'<img src="data:image/png;base64,{_LOGO}" class="auth-logo-img"/>'
-            f'</div>',
-            unsafe_allow_html=True
-        )
-    else:
-        st.markdown('<span class="auth-logo-emoji">🏛️</span>', unsafe_allow_html=True)
+    # Use columns to center the form
+    _, mid, _ = st.columns([1, 2, 1])
 
-    if st.session_state.auth_screen == "login":
-        st.markdown('<div class="auth-title">Welcome Back 👋</div>', unsafe_allow_html=True)
-        st.markdown('<div class="auth-subtitle">ANITS · Soil Testing System</div>', unsafe_allow_html=True)
+    with mid:
+        # ── Logo ──
+        if _LOGO:
+            st.markdown(
+                f'<div style="text-align:center;margin-bottom:10px;">'
+                f'<img src="data:image/png;base64,{_LOGO}" '
+                f'style="width:90px;height:90px;border-radius:16px;object-fit:contain;'
+                f'background:white;padding:6px;border:2px solid rgba(0,160,255,0.38);'
+                f'box-shadow:0 0 28px rgba(0,120,255,0.32);"/>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+        else:
+            st.markdown('<div style="text-align:center;font-size:3.5rem;">🏛️</div>', unsafe_allow_html=True)
 
-        email    = st.text_input("📧  Email address", key="login_email", placeholder="you@example.com")
-        password = st.text_input("🔒  Password", type="password", key="login_pass", placeholder="Enter your password")
-        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        # ── Card wrapper (styling only, no widgets inside) ──
+        if st.session_state.auth_screen == "login":
+            st.markdown("""
+            <div style="text-align:center;margin-bottom:4px;">
+                <span style="font-size:1.4rem;font-weight:800;color:#fff;">Welcome Back 👋</span>
+            </div>
+            <div style="text-align:center;margin-bottom:20px;">
+                <span style="font-size:0.84rem;color:rgba(175,215,255,0.8);">ANITS · Soil Testing System</span>
+            </div>
+            """, unsafe_allow_html=True)
 
-        if st.button("Sign In  →", use_container_width=True, key="signin_btn"):
-            if not email or not password:
-                st.error("Please fill in all fields.")
-            else:
-                ok, name, msg = login_user(email.strip().lower(), password)
-                if ok:
-                    st.session_state.logged_in  = True
-                    st.session_state.user_name  = name
-                    st.session_state.user_email = email.strip().lower()
-                    st.rerun()
+            email    = st.text_input("📧  Email address", key="login_email", placeholder="you@example.com")
+            password = st.text_input("🔒  Password", type="password", key="login_pass", placeholder="Enter your password")
+            st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+
+            if st.button("🔐  Sign In", use_container_width=True, key="signin_btn"):
+                if not email or not password:
+                    st.error("Please fill in all fields.")
                 else:
-                    st.error(msg)
+                    ok, name, msg = login_user(email.strip().lower(), password)
+                    if ok:
+                        st.session_state.logged_in  = True
+                        st.session_state.user_name  = name
+                        st.session_state.user_email = email.strip().lower()
+                        st.rerun()
+                    else:
+                        st.error(msg)
 
-        st.markdown('<div class="auth-divider">or</div>', unsafe_allow_html=True)
-        if st.button("Create a New Account", use_container_width=True, key="goto_signup"):
-            st.session_state.auth_screen = "signup"
-            st.rerun()
+            st.markdown("<div style='text-align:center;margin:12px 0;color:rgba(150,190,230,0.6);font-size:0.8rem;'>── or ──</div>", unsafe_allow_html=True)
 
-    else:
-        st.markdown('<div class="auth-title">Create Account 🎓</div>', unsafe_allow_html=True)
-        st.markdown('<div class="auth-subtitle">Join ANITS Soil Testing System</div>', unsafe_allow_html=True)
+            if st.button("✏️  Create a New Account", use_container_width=True, key="goto_signup"):
+                st.session_state.auth_screen = "signup"
+                st.rerun()
 
-        full_name        = st.text_input("👤  Full Name",        key="reg_name",  placeholder="e.g. Ravi Kumar")
-        email            = st.text_input("📧  Email Address",    key="reg_email", placeholder="you@example.com")
-        password         = st.text_input("🔒  Password",         type="password", key="reg_pass",  placeholder="Min. 6 characters")
-        confirm_password = st.text_input("🔒  Confirm Password", type="password", key="reg_pass2", placeholder="Re-enter password")
-        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div style="text-align:center;margin-bottom:4px;">
+                <span style="font-size:1.4rem;font-weight:800;color:#fff;">Create Account 🎓</span>
+            </div>
+            <div style="text-align:center;margin-bottom:20px;">
+                <span style="font-size:0.84rem;color:rgba(175,215,255,0.8);">Join ANITS Soil Testing System</span>
+            </div>
+            """, unsafe_allow_html=True)
 
-        if st.button("Create Account  →", use_container_width=True, key="create_btn"):
-            if not full_name or not email or not password or not confirm_password:
-                st.error("Please fill in all fields.")
-            elif len(password) < 6:
-                st.error("Password must be at least 6 characters.")
-            elif password != confirm_password:
-                st.error("Passwords do not match.")
-            else:
-                ok, msg = register_user(full_name.strip(), email.strip().lower(), password)
-                if ok:
-                    st.success(msg + " Please sign in.")
-                    st.session_state.auth_screen = "login"
-                    st.rerun()
+            full_name        = st.text_input("👤  Full Name",        key="reg_name",  placeholder="e.g. Ravi Kumar")
+            email            = st.text_input("📧  Email Address",    key="reg_email", placeholder="you@example.com")
+            password         = st.text_input("🔒  Password",         type="password", key="reg_pass",  placeholder="Min. 6 characters")
+            confirm_password = st.text_input("🔒  Confirm Password", type="password", key="reg_pass2", placeholder="Re-enter password")
+            st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+
+            if st.button("🎓  Create Account", use_container_width=True, key="create_btn"):
+                if not full_name or not email or not password or not confirm_password:
+                    st.error("Please fill in all fields.")
+                elif len(password) < 6:
+                    st.error("Password must be at least 6 characters.")
+                elif password != confirm_password:
+                    st.error("Passwords do not match.")
                 else:
-                    st.error(msg)
+                    ok, msg = register_user(full_name.strip(), email.strip().lower(), password)
+                    if ok:
+                        st.success(msg + " Please sign in.")
+                        st.session_state.auth_screen = "login"
+                        st.rerun()
+                    else:
+                        st.error(msg)
 
-        st.markdown('<div class="auth-divider">or</div>', unsafe_allow_html=True)
-        if st.button("Sign In Instead", use_container_width=True, key="goto_login"):
-            st.session_state.auth_screen = "login"
-            st.rerun()
+            st.markdown("<div style='text-align:center;margin:12px 0;color:rgba(150,190,230,0.6);font-size:0.8rem;'>── or ──</div>", unsafe_allow_html=True)
 
-    st.markdown('</div>', unsafe_allow_html=True)  # close auth-card
-    st.markdown('</div>', unsafe_allow_html=True)  # close auth-page-wrap
+            if st.button("🔐  Sign In Instead", use_container_width=True, key="goto_login"):
+                st.session_state.auth_screen = "login"
+                st.rerun()
 
 
 # ==========================
@@ -955,9 +1088,11 @@ else:
         ["🧪  Run Tests", "🕒  Test History", "🤖  AI Assistant"],
         index=0 if st.session_state.view_mode == "test" else (1 if st.session_state.view_mode == "history" else 2)
     )
-    if "Run"     in nav: st.session_state.view_mode = "test"
-    elif "History" in nav: st.session_state.view_mode = "history"
-    else:                  st.session_state.view_mode = "ai"
+    # Track page history for back button
+    new_mode = "test" if "Run" in nav else ("history" if "History" in nav else "ai")
+    if new_mode != st.session_state.view_mode:
+        st.session_state.page_history.append(st.session_state.view_mode)
+        st.session_state.view_mode = new_mode
 
     selected_test   = None
     selected_module = None
@@ -1002,6 +1137,7 @@ else:
     # AI ASSISTANT VIEW
     # ==========================
     if st.session_state.view_mode == "ai":
+        show_back_button()
         st.markdown('<p style="font-size:1.25rem;font-weight:800;color:#fff;margin-bottom:4px;">🤖 AI Soil Assistant</p>', unsafe_allow_html=True)
         st.markdown('<p style="font-size:0.84rem;color:rgba(180,215,255,0.82);margin-bottom:16px;">Ask anything about soil tests, IS codes, or engineering design.</p>', unsafe_allow_html=True)
         ai_chatbot(key_prefix="inapp")
@@ -1010,6 +1146,7 @@ else:
     # HISTORY VIEW
     # ==========================
     elif st.session_state.view_mode == "history":
+        show_back_button()
         history = load_history(st.session_state.user_email)
         col_title, col_clear = st.columns([5, 1])
         with col_title:
@@ -1129,3 +1266,24 @@ else:
             st.markdown('<div class="share-section">', unsafe_allow_html=True)
             share_buttons(selected_test, res, doc_bytes=single_doc_bytes, inside_expander=False)
             st.markdown('</div>', unsafe_allow_html=True)
+
+    # ==========================
+    # FLOATING SCROLL-TO-TOP BTN
+    # (mobile WebView helper)
+    # ==========================
+    st.markdown("""
+    <button onclick="window.scrollTo({top:0,behavior:'smooth'})"
+        style="
+            position:fixed; bottom:24px; right:18px; z-index:9999;
+            background:linear-gradient(135deg,rgba(0,100,255,0.92),rgba(0,60,200,1));
+            color:#fff; border:2px solid rgba(0,200,255,0.5);
+            border-radius:50%; width:48px; height:48px;
+            font-size:1.3rem; font-weight:900;
+            box-shadow:0 4px 20px rgba(0,100,255,0.5);
+            cursor:pointer; display:flex; align-items:center; justify-content:center;
+            line-height:1;
+        "
+        title="Scroll to top">
+        ↑
+    </button>
+    """, unsafe_allow_html=True)
