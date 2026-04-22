@@ -20,6 +20,24 @@ st.set_page_config(
 )
 
 # --------------------------
+# SESSION STATE — must be initialised FIRST before any st.stop()
+# --------------------------
+for key, default in {
+    "app_started": False,
+    "auth_screen": "login",
+    "logged_in": False,
+    "user_name": "",
+    "user_email": "",
+    "completed_tests": {},
+    "view_mode": "test",
+    "last_result": None,
+    "last_test_name": None,
+    "page_history": [],
+}.items():
+    if key not in st.session_state:
+        st.session_state[key] = default
+
+# --------------------------
 # USER DATABASE
 # --------------------------
 USER_DB_FILE = "users.json"
@@ -392,12 +410,9 @@ def logo_html(size=110, radius=20):
             f'style="width:{size}px;height:{size}px;border-radius:{radius}px;'
             f'object-fit:contain;background:white;padding:6px;'
             f'border:2px solid rgba(0,160,255,0.4);'
-            f'box-shadow:0 0 40px rgba(0,120,255,0.35);margin-bottom:18px;display:block;margin-left:auto;margin-right:auto;"/>'
+            f'box-shadow:0 0 40px rgba(0,120,255,0.35);margin-bottom:14px;display:block;margin-left:auto;margin-right:auto;"/>'
         )
-    return f'<div style="font-size:{int(size*0.35)}px;margin-bottom:18px;filter:drop-shadow(0 0 16px rgba(0,160,255,0.5));text-align:center;">🏛️</div>'
-
-
-
+    return f'<div style="font-size:{int(size*0.35)}px;margin-bottom:14px;filter:drop-shadow(0 0 16px rgba(0,160,255,0.5));text-align:center;">🏛️</div>'
 
 
 # ==========================
@@ -410,7 +425,6 @@ st.markdown("""
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 * { font-family: 'Sora', sans-serif !important; }
 
-/* ══ ROOT — fixed height viewport, children scroll independently ══ */
 html, body {
     height: 100% !important;
     max-height: 100vh !important;
@@ -418,7 +432,6 @@ html, body {
     background: #03050f !important;
 }
 
-/* ══ APP CONTAINER — full height, flex row ══ */
 .stApp {
     background: #03050f !important;
     height: 100vh !important;
@@ -438,7 +451,6 @@ html, body {
 }
 @keyframes bgPulse { 0%{transform:scale(1) rotate(0deg)} 100%{transform:scale(1.08) rotate(3deg)} }
 
-/* ══ SIDEBAR — fixed height, scrolls independently ══ */
 section[data-testid="stSidebar"] {
     height: 100vh !important;
     max-height: 100vh !important;
@@ -461,7 +473,6 @@ section[data-testid="stSidebar"] > div {
     padding-bottom: 30px !important;
 }
 
-/* ══ MAIN CONTENT — fills remaining space, scrolls independently ══ */
 section.main,
 .main,
 div[data-testid="stAppViewContainer"] > section.main {
@@ -474,7 +485,6 @@ div[data-testid="stAppViewContainer"] > section.main {
     overscroll-behavior: contain !important;
 }
 
-/* ══ INNER CONTENT — natural height, no restrictions ══ */
 section.main > div,
 .main > div,
 .block-container,
@@ -489,27 +499,14 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
 
 .main .block-container {
     position: relative; z-index: 1;
-    padding-top: 1.5rem !important;
-    padding-bottom: 5rem !important;
+    padding-top: 1rem !important;
+    padding-bottom: 4rem !important;
     max-width: 1200px !important;
     width: 100% !important;
 }
 
 #MainMenu, footer, header { visibility: hidden; }
 .stDeployButton { display: none; }
-
-/* ══ MOBILE BACK BUTTON ══ */
-.mobile-back-btn {
-    position: fixed; bottom: 20px; left: 50%;
-    transform: translateX(-50%); z-index: 9999;
-    background: linear-gradient(135deg, rgba(0,100,255,0.95), rgba(0,60,200,1));
-    color: #fff !important; border: 2px solid rgba(0,200,255,0.5);
-    border-radius: 50px; padding: 12px 32px;
-    font-size: 1rem; font-weight: 800;
-    box-shadow: 0 6px 28px rgba(0,100,255,0.5);
-    cursor: pointer; display: flex; align-items: center;
-    gap: 8px; white-space: nowrap; transition: all 0.2s ease;
-}
 
 /* ══ MOBILE RESPONSIVE ══ */
 @media (max-width: 768px) {
@@ -523,16 +520,13 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
     .feat-grid { grid-template-columns: repeat(2,1fr) !important; }
     .metric-row { flex-direction: column !important; }
     .welcome-h1 { font-size: 1.6rem !important; }
-    .auth-card { padding: 24px 20px !important; }
     div[data-testid="stLinkButton"] > a { font-size: 0.75rem !important; padding: 0.4rem !important; }
 }
 
-/* ══ SIDEBAR MOBILE — always visible, proper toggle ══ */
 @media (max-width: 768px) {
     section[data-testid="stSidebar"] {
         position: fixed !important;
-        left: 0 !important;
-        top: 0 !important;
+        left: 0 !important; top: 0 !important;
         z-index: 999 !important;
         width: 80vw !important;
         max-width: 300px !important;
@@ -541,85 +535,81 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
     section[data-testid="stSidebar"][aria-expanded="false"] {
         transform: translateX(-100%) !important;
     }
-    section.main {
-        width: 100% !important;
-        margin-left: 0 !important;
-    }
+    section.main { width: 100% !important; margin-left: 0 !important; }
 }
 
-/* ══ EXPANDER FIX — clear text, proper icon ══ */
+/* ══ EXPANDER — fixed text rendering ══ */
 div[data-testid="stExpander"] {
     background: rgba(0,20,60,0.45) !important;
     border: 1px solid rgba(0,100,200,0.28) !important;
     border-radius: 12px !important;
     overflow: hidden !important;
 }
-div[data-testid="stExpander"] summary {
+/* Use [data-testid] selectors instead of 'summary' to avoid cross-browser garbling */
+div[data-testid="stExpander"] > details > summary,
+div[data-testid="stExpander"] button[kind="header"] {
     color: rgba(205,228,255,0.95) !important;
     font-weight: 600 !important;
     font-size: 0.9rem !important;
     padding: 12px 16px !important;
-    list-style: none !important;
     cursor: pointer !important;
+    background: rgba(0,40,100,0.35) !important;
     display: flex !important;
     align-items: center !important;
     gap: 8px !important;
-    background: rgba(0,40,100,0.35) !important;
+    /* Remove any text-transform or font scrambling */
+    font-variant: normal !important;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+    font-feature-settings: normal !important;
+    -webkit-font-smoothing: antialiased !important;
 }
-div[data-testid="stExpander"] summary::-webkit-details-marker { display: none !important; }
-div[data-testid="stExpander"] summary::marker { display: none !important; }
 div[data-testid="stExpander"] > div {
     padding: 12px 16px !important;
     color: rgba(205,228,255,0.9) !important;
 }
 
-/* ══ PAGE TRANSITION — prevent flash ══ */
-.stApp {
-    animation: fadeIn 0.3s ease-in-out !important;
-}
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-.stDeployButton { display: none; }
+.stApp { animation: fadeIn 0.3s ease-in-out !important; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 /* ══════════════════════
-   WELCOME PAGE
+   WELCOME PAGE — compact to fit viewport without scrolling
 ══════════════════════ */
 .welcome-wrap {
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    text-align: center; padding: 30px 20px 20px 20px;
+    text-align: center;
+    padding: 16px 20px 12px 20px;
     min-height: auto;
 }
 .welcome-badge {
     display: inline-flex; align-items: center; gap: 8px;
     background: rgba(0,100,255,0.15); border: 1px solid rgba(0,160,255,0.35);
-    border-radius: 100px; padding: 6px 18px;
-    font-size: 0.76rem; font-weight: 700; color: rgba(200,230,255,0.95);
-    letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 16px;
+    border-radius: 100px; padding: 5px 16px;
+    font-size: 0.73rem; font-weight: 700; color: rgba(200,230,255,0.95);
+    letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 12px;
 }
 .welcome-h1 {
-    font-size: clamp(2rem,4.5vw,3rem); font-weight: 900; color: #fff;
-    line-height: 1.15; margin-bottom: 12px; letter-spacing: -0.02em;
+    font-size: clamp(1.8rem,4vw,2.6rem); font-weight: 900; color: #fff;
+    line-height: 1.15; margin-bottom: 10px; letter-spacing: -0.02em;
 }
 .welcome-h1 span {
     background: linear-gradient(135deg,#0099ff,#00ddbb);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
 }
 .welcome-sub {
-    font-size: 0.95rem; color: rgba(185,218,255,0.85);
-    line-height: 1.65; margin-bottom: 22px; max-width: 480px;
+    font-size: 0.88rem; color: rgba(185,218,255,0.85);
+    line-height: 1.55; margin-bottom: 16px; max-width: 460px;
 }
 .feat-grid {
     display: grid; grid-template-columns: repeat(3,1fr);
-    gap: 8px; margin-bottom: 36px; width: 100%; max-width: 560px;
+    gap: 7px; margin-bottom: 20px; width: 100%; max-width: 540px;
 }
 .feat-item {
     background: rgba(0,60,160,0.25); border: 1px solid rgba(0,120,255,0.25);
-    border-radius: 10px; padding: 9px 12px;
-    font-size: 0.78rem; color: rgba(200,230,255,0.92); font-weight: 600;
-    display: flex; align-items: center; gap: 6px;
+    border-radius: 9px; padding: 7px 10px;
+    font-size: 0.75rem; color: rgba(200,230,255,0.92); font-weight: 600;
+    display: flex; align-items: center; gap: 5px;
     transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1);
 }
 .feat-item:hover {
@@ -628,96 +618,33 @@ div[data-testid="stExpander"] > div {
 }
 
 /* ══════════════════════
-   AUTH CARD
-══════════════════════ */
-.auth-page-wrap {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 85vh;
-    padding: 20px;
-}
-.auth-card {
-    background: rgba(6,12,36,0.93);
-    border: 1px solid rgba(0,120,255,0.28); border-radius: 24px;
-    padding: 36px 44px 30px 44px;
-    backdrop-filter: blur(32px);
-    box-shadow: 0 0 0 1px rgba(0,80,200,0.1), 0 30px 100px rgba(0,0,0,0.7);
-    position: relative; overflow: hidden;
-    width: 100%; max-width: 480px;
-    margin: 0 auto;
-}
-.auth-card::before {
-    content: ''; position: absolute; top: -1px; left: 12%; right: 12%; height: 2px;
-    background: linear-gradient(90deg,transparent,rgba(0,180,255,0.9),transparent);
-    animation: shimmer 3s ease-in-out infinite;
-}
-@keyframes shimmer { 0%,100%{opacity:0.3} 50%{opacity:1} }
-
-.auth-logo-wrap { display: flex; justify-content: center; margin-bottom: 12px; }
-.auth-logo-img {
-    width: 90px; height: 90px; border-radius: 16px;
-    object-fit: contain; background: white; padding: 6px;
-    border: 2px solid rgba(0,160,255,0.38);
-    box-shadow: 0 0 28px rgba(0,120,255,0.32);
-    animation: logoFloat 4s ease-in-out infinite;
-}
-@keyframes logoFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
-
-.auth-logo-emoji {
-    font-size: 4.5rem; text-align: center; display: block;
-    filter: drop-shadow(0 0 18px rgba(0,160,255,0.6));
-    margin-bottom: 10px; animation: logoFloat 4s ease-in-out infinite;
-}
-.auth-title { font-size: 1.5rem; font-weight: 800; color: #fff; text-align: center; margin-bottom: 4px; }
-.auth-subtitle { font-size: 0.84rem; color: rgba(175,215,255,0.8); text-align: center; margin-bottom: 22px; letter-spacing: 0.04em; }
-.auth-divider {
-    display: flex; align-items: center; gap: 10px;
-    margin: 16px 0; color: rgba(150,190,230,0.6);
-    font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase;
-}
-.auth-divider::before, .auth-divider::after { content:""; flex:1; height:1px; background:rgba(0,100,200,0.22); }
-
-/* ══════════════════════
-   GLOBAL BUTTONS — normal flow (no fixed positioning)
+   GLOBAL BUTTONS
 ══════════════════════ */
 div.stButton > button {
     position: relative !important;
-    left: auto !important;
-    bottom: auto !important;
-    transform: none !important;
+    left: auto !important; bottom: auto !important; transform: none !important;
     background: linear-gradient(135deg, rgba(0,100,255,0.88), rgba(0,60,200,0.96)) !important;
     color: #ffffff !important;
     border: 1px solid rgba(0,160,255,0.45) !important;
-    border-radius: 10px !important;
-    font-size: 0.95rem !important;
-    font-weight: 700 !important;
-    padding: 0.6rem 1.5rem !important;
+    border-radius: 10px !important; font-size: 0.95rem !important;
+    font-weight: 700 !important; padding: 0.6rem 1.5rem !important;
     box-shadow: 0 4px 16px rgba(0,80,200,0.28) !important;
     transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1) !important;
-    width: auto !important;
-    white-space: nowrap !important;
-    cursor: pointer !important;
+    width: auto !important; white-space: nowrap !important; cursor: pointer !important;
 }
 div.stButton > button:hover {
     background: linear-gradient(135deg, rgba(0,150,255,0.96), rgba(0,90,240,1)) !important;
     border-color: rgba(0,210,255,0.7) !important;
     box-shadow: 0 10px 32px rgba(0,150,255,0.5) !important;
-    transform: translateY(-3px) scale(1.02) !important;
-    color: #fff !important;
+    transform: translateY(-3px) scale(1.02) !important; color: #fff !important;
 }
-div.stButton > button:active {
-    transform: translateY(-1px) scale(1.00) !important;
-}
+div.stButton > button:active { transform: translateY(-1px) scale(1.00) !important; }
 
-/* Welcome launch button — centered, larger */
+/* Welcome launch button */
 .welcome-launch-btn div.stButton > button {
-    font-size: 1.1rem !important;
-    padding: 0.75rem 3rem !important;
-    border-radius: 50px !important;
-    border: 2px solid rgba(0,210,255,0.55) !important;
-    box-shadow: 0 6px 32px rgba(0,120,255,0.55) !important;
-    min-width: 240px !important;
+    font-size: 1.05rem !important; padding: 0.7rem 2.5rem !important;
+    border-radius: 50px !important; border: 2px solid rgba(0,210,255,0.55) !important;
+    box-shadow: 0 6px 32px rgba(0,120,255,0.55) !important; min-width: 220px !important;
 }
 .welcome-launch-btn div.stButton > button:hover {
     box-shadow: 0 14px 44px rgba(0,160,255,0.7) !important;
@@ -810,9 +737,6 @@ section[data-testid="stSidebar"] * { color: rgba(210,232,255,0.92) !important; }
     font-family:'JetBrains Mono',monospace !important;
 }
 
-/* ══════════════════════
-   CLASS SECTION
-══════════════════════ */
 .class-section { background:rgba(0,40,100,0.38); border:1px solid rgba(0,140,255,0.28); border-radius:13px; padding:18px 22px; margin-bottom:14px; backdrop-filter:blur(12px); }
 
 /* ══════════════════════
@@ -859,7 +783,8 @@ div[data-testid="stTextArea"] textarea::placeholder { color: rgba(140,180,230,0.
 div[data-testid="stTextInput"] input:focus,
 div[data-testid="stNumberInput"] input:focus,
 div[data-testid="stTextArea"] textarea:focus {
-    border-color: rgba(0,190,255,0.65) !important; box-shadow: 0 0 0 3px rgba(0,150,255,0.14) !important; outline: none !important;
+    border-color: rgba(0,190,255,0.65) !important;
+    box-shadow: 0 0 0 3px rgba(0,150,255,0.14) !important; outline: none !important;
 }
 div[data-testid="stTextInput"] label,
 div[data-testid="stNumberInput"] label,
@@ -899,7 +824,6 @@ b, strong { color:#fff !important; }
 [data-testid="stDataFrame"] { background:rgba(0,20,60,0.45) !important; border:1px solid rgba(0,100,200,0.22) !important; border-radius:10px !important; }
 div[data-testid="stExpander"] { background:rgba(0,20,60,0.38) !important; border:1px solid rgba(0,100,200,0.22) !important; border-radius:12px !important; transition:all 0.2s ease !important; }
 div[data-testid="stExpander"]:hover { border-color:rgba(0,150,255,0.38) !important; }
-div[data-testid="stExpander"] summary { color:rgba(205,228,255,0.92) !important; font-weight:600 !important; }
 
 ::-webkit-scrollbar { width:5px; }
 ::-webkit-scrollbar-track { background:rgba(0,20,60,0.3); }
@@ -913,30 +837,11 @@ div[data-testid="stNumberInput"] button:hover { background:rgba(0,80,200,0.5) !i
 </style>
 """, unsafe_allow_html=True)
 
-# --------------------------
-# SESSION STATE
-# --------------------------
-for key, default in {
-    "app_started": False,
-    "auth_screen": "login",
-    "logged_in": False,
-    "user_name": "",
-    "user_email": "",
-    "completed_tests": {},
-    "view_mode": "test",
-    "last_result": None,
-    "last_test_name": None,
-    "page_history": [],
-}.items():
-    if key not in st.session_state:
-        st.session_state[key] = default
-
 
 # --------------------------
 # BACK BUTTON HELPER
 # --------------------------
 def show_back_button():
-    """Show a back button if there is navigation history."""
     if len(st.session_state.page_history) > 0:
         st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
         col1, col2, col3 = st.columns([1, 2, 1])
@@ -949,13 +854,15 @@ def show_back_button():
 
 
 # ==========================
-# WELCOME SCREEN
+# ROUTING — check state ONCE, in priority order
+# No re-renders, no flashes
 # ==========================
-if not st.session_state.app_started:
 
+# ── STEP 1: Welcome screen ──────────────────────────────────────────────────
+if not st.session_state.app_started:
     st.markdown(f"""
     <div class="welcome-wrap">
-        {logo_html(size=118, radius=22)}
+        {logo_html(size=100, radius=20)}
         <div class="welcome-badge">🏗️ ANITS · Civil Engineering</div>
         <div class="welcome-h1">Soil Testing<br><span>Analysis System</span></div>
         <div class="welcome-sub">
@@ -973,7 +880,6 @@ if not st.session_state.app_started:
     </div>
     """, unsafe_allow_html=True)
 
-    # Centered launch button — normal flow, no fixed positioning
     col_left, col_center, col_right = st.columns([2, 1, 2])
     with col_center:
         st.markdown('<div class="welcome-launch-btn">', unsafe_allow_html=True)
@@ -981,21 +887,17 @@ if not st.session_state.app_started:
             st.session_state.app_started = True
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
-    st.stop()  # ← prevent any other screen from flashing below
+
+    st.stop()   # ← nothing below executes on the welcome screen
 
 
-# ==========================
-# AUTH SCREEN
-# ==========================
+# ── STEP 2: Auth screen ─────────────────────────────────────────────────────
 elif not st.session_state.logged_in:
 
     st.markdown("<div style='height:30px'></div>", unsafe_allow_html=True)
-
-    # Use columns to center the form
     _, mid, _ = st.columns([1, 2, 1])
 
     with mid:
-        # ── Logo ──
         if _LOGO:
             st.markdown(
                 f'<div style="text-align:center;margin-bottom:10px;">'
@@ -1009,7 +911,6 @@ elif not st.session_state.logged_in:
         else:
             st.markdown('<div style="text-align:center;font-size:3.5rem;">🏛️</div>', unsafe_allow_html=True)
 
-        # ── Card wrapper (styling only, no widgets inside) ──
         if st.session_state.auth_screen == "login":
             st.markdown("""
             <div style="text-align:center;margin-bottom:4px;">
@@ -1043,7 +944,7 @@ elif not st.session_state.logged_in:
                 st.session_state.auth_screen = "signup"
                 st.rerun()
 
-        else:
+        else:  # signup
             st.markdown("""
             <div style="text-align:center;margin-bottom:4px;">
                 <span style="font-size:1.4rem;font-weight:800;color:#fff;">Create Account 🎓</span>
@@ -1081,12 +982,10 @@ elif not st.session_state.logged_in:
                 st.session_state.auth_screen = "login"
                 st.rerun()
 
-    st.stop()  # ← prevent main app from flashing below auth screen
+    st.stop()   # ← nothing below executes on the auth screen
 
 
-# ==========================
-# MAIN APP
-# ==========================
+# ── STEP 3: Main App (only runs when logged_in=True) ────────────────────────
 else:
     try:
         from history_manager import load_history, save_history, clear_history
@@ -1122,7 +1021,7 @@ else:
     except ImportError:
         tests = {"Demo Test": None}
 
-    # ── SIDEBAR ──
+    # ── SIDEBAR ──────────────────────────────────────────────────────────────
     st.sidebar.markdown('<div style="display:flex;justify-content:center;padding:10px 0 6px 0;">', unsafe_allow_html=True)
     try:
         st.sidebar.image("assets/anits_logo.png", width=90)
@@ -1146,7 +1045,6 @@ else:
         ["🧪  Run Tests", "🕒  Test History", "🤖  AI Assistant"],
         index=0 if st.session_state.view_mode == "test" else (1 if st.session_state.view_mode == "history" else 2)
     )
-    # Track page history for back button
     new_mode = "test" if "Run" in nav else ("history" if "History" in nav else "ai")
     if new_mode != st.session_state.view_mode:
         st.session_state.page_history.append(st.session_state.view_mode)
@@ -1183,7 +1081,7 @@ else:
             st.session_state.pop(key, None)
         st.rerun()
 
-    # ── HEADER ──
+    # ── HEADER ───────────────────────────────────────────────────────────────
     st.markdown("""
     <div class="header-banner">
         <h2>🏗️ Soil Tests Analysis Dashboard</h2>
@@ -1191,18 +1089,14 @@ else:
     </div>
     """, unsafe_allow_html=True)
 
-    # ==========================
-    # AI ASSISTANT VIEW
-    # ==========================
+    # ── AI ASSISTANT VIEW ─────────────────────────────────────────────────────
     if st.session_state.view_mode == "ai":
         show_back_button()
         st.markdown('<p style="font-size:1.25rem;font-weight:800;color:#fff;margin-bottom:4px;">🤖 AI Soil Assistant</p>', unsafe_allow_html=True)
         st.markdown('<p style="font-size:0.84rem;color:rgba(180,215,255,0.82);margin-bottom:16px;">Ask anything about soil tests, IS codes, or engineering design.</p>', unsafe_allow_html=True)
         ai_chatbot(key_prefix="inapp")
 
-    # ==========================
-    # HISTORY VIEW
-    # ==========================
+    # ── HISTORY VIEW ──────────────────────────────────────────────────────────
     elif st.session_state.view_mode == "history":
         show_back_button()
         history = load_history(st.session_state.user_email)
@@ -1278,9 +1172,7 @@ else:
                 with st.expander(f"📤 Share — {test_name}"):
                     share_buttons(test_name, summary, inside_expander=True)
 
-    # ==========================
-    # TEST VIEW
-    # ==========================
+    # ── TEST VIEW ─────────────────────────────────────────────────────────────
     else:
         if selected_module is not None:
             result = selected_module.run()
@@ -1296,7 +1188,7 @@ else:
             st.toast(f"✅ '{selected_test}' saved to history!", icon="🕒")
 
         if st.session_state.last_result and st.session_state.last_test_name == selected_test:
-            res = st.session_state.last_result
+            res  = st.session_state.last_result
             recs = get_is_recommendations(selected_test, res)
 
             st.markdown("---")
@@ -1325,10 +1217,7 @@ else:
             share_buttons(selected_test, res, doc_bytes=single_doc_bytes, inside_expander=False)
             st.markdown('</div>', unsafe_allow_html=True)
 
-    # ==========================
-    # FLOATING SCROLL-TO-TOP BTN
-    # (mobile WebView helper)
-    # ==========================
+    # ── SCROLL TO TOP BUTTON ──────────────────────────────────────────────────
     st.markdown("""
     <button onclick="window.scrollTo({top:0,behavior:'smooth'})"
         style="
