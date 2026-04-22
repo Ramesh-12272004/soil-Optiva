@@ -397,9 +397,6 @@ def logo_html(size=110, radius=20):
     return f'<div style="font-size:{int(size*0.35)}px;margin-bottom:18px;filter:drop-shadow(0 0 16px rgba(0,160,255,0.5));text-align:center;">🏛️</div>'
 
 
-
-
-
 # ==========================
 # CSS
 # ==========================
@@ -410,7 +407,6 @@ st.markdown("""
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 * { font-family: 'Sora', sans-serif !important; }
 
-/* ══ ROOT — fixed height viewport, children scroll independently ══ */
 html, body {
     height: 100% !important;
     max-height: 100vh !important;
@@ -418,7 +414,6 @@ html, body {
     background: #03050f !important;
 }
 
-/* ══ APP CONTAINER — full height, flex row ══ */
 .stApp {
     background: #03050f !important;
     height: 100vh !important;
@@ -438,7 +433,6 @@ html, body {
 }
 @keyframes bgPulse { 0%{transform:scale(1) rotate(0deg)} 100%{transform:scale(1.08) rotate(3deg)} }
 
-/* ══ SIDEBAR — fixed height, scrolls independently ══ */
 section[data-testid="stSidebar"] {
     height: 100vh !important;
     max-height: 100vh !important;
@@ -461,7 +455,6 @@ section[data-testid="stSidebar"] > div {
     padding-bottom: 30px !important;
 }
 
-/* ══ MAIN CONTENT — fills remaining space, scrolls independently ══ */
 section.main,
 .main,
 div[data-testid="stAppViewContainer"] > section.main {
@@ -474,7 +467,6 @@ div[data-testid="stAppViewContainer"] > section.main {
     overscroll-behavior: contain !important;
 }
 
-/* ══ INNER CONTENT — natural height, no restrictions ══ */
 section.main > div,
 .main > div,
 .block-container,
@@ -498,7 +490,6 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
 #MainMenu, footer, header { visibility: hidden; }
 .stDeployButton { display: none; }
 
-/* ══ MOBILE BACK BUTTON ══ */
 .mobile-back-btn {
     position: fixed; bottom: 20px; left: 50%;
     transform: translateX(-50%); z-index: 9999;
@@ -511,7 +502,6 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
     gap: 8px; white-space: nowrap; transition: all 0.2s ease;
 }
 
-/* ══ MOBILE RESPONSIVE ══ */
 @media (max-width: 768px) {
     .main .block-container {
         padding-left: 0.8rem !important;
@@ -527,7 +517,6 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
     div[data-testid="stLinkButton"] > a { font-size: 0.75rem !important; padding: 0.4rem !important; }
 }
 
-/* ══ SIDEBAR MOBILE — always visible, proper toggle ══ */
 @media (max-width: 768px) {
     section[data-testid="stSidebar"] {
         position: fixed !important;
@@ -547,7 +536,7 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
     }
 }
 
-/* ══ EXPANDER FIX — clear text, proper icon ══ */
+/* ══ EXPANDER FIX — works on all Streamlit versions ══ */
 div[data-testid="stExpander"] {
     background: rgba(0,20,60,0.45) !important;
     border: 1px solid rgba(0,100,200,0.28) !important;
@@ -568,12 +557,28 @@ div[data-testid="stExpander"] summary {
 }
 div[data-testid="stExpander"] summary::-webkit-details-marker { display: none !important; }
 div[data-testid="stExpander"] summary::marker { display: none !important; }
+
+/* Hide the arrow/toggle icon — all Streamlit versions */
+div[data-testid="stExpander"] summary svg { display: none !important; }
+div[data-testid="stExpander"] summary [data-testid="stExpanderToggleIcon"] { display: none !important; }
+div[data-testid="stExpander"] summary [class*="ExpanderToggle"] { display: none !important; }
+div[data-testid="stExpander"] summary [class*="expanderIcon"] { display: none !important; }
+div[data-testid="stExpander"] summary > div:first-child { display: none !important; }
+
+/* Fix label text — ensure it shows cleanly */
+div[data-testid="stExpander"] summary p {
+    color: rgba(205,228,255,0.95) !important;
+    font-weight: 600 !important;
+    font-size: 0.9rem !important;
+    margin: 0 !important;
+    display: inline !important;
+}
+
 div[data-testid="stExpander"] > div {
     padding: 12px 16px !important;
     color: rgba(205,228,255,0.9) !important;
 }
 
-/* ══ PAGE TRANSITION — prevent flash ══ */
 .stApp {
     animation: fadeIn 0.3s ease-in-out !important;
 }
@@ -583,9 +588,7 @@ div[data-testid="stExpander"] > div {
 }
 .stDeployButton { display: none; }
 
-/* ══════════════════════
-   WELCOME PAGE
-══════════════════════ */
+/* ══ WELCOME PAGE ══ */
 .welcome-wrap {
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
@@ -627,9 +630,7 @@ div[data-testid="stExpander"] > div {
     transform: translateY(-3px) scale(1.02); color: #fff;
 }
 
-/* ══════════════════════
-   AUTH CARD
-══════════════════════ */
+/* ══ AUTH CARD ══ */
 .auth-page-wrap {
     display: flex;
     align-items: center;
@@ -678,9 +679,7 @@ div[data-testid="stExpander"] > div {
 }
 .auth-divider::before, .auth-divider::after { content:""; flex:1; height:1px; background:rgba(0,100,200,0.22); }
 
-/* ══════════════════════
-   GLOBAL BUTTONS — normal flow (no fixed positioning)
-══════════════════════ */
+/* ══ GLOBAL BUTTONS ══ */
 div.stButton > button {
     position: relative !important;
     left: auto !important;
@@ -710,7 +709,6 @@ div.stButton > button:active {
     transform: translateY(-1px) scale(1.00) !important;
 }
 
-/* Welcome launch button — centered, larger */
 .welcome-launch-btn div.stButton > button {
     font-size: 1.1rem !important;
     padding: 0.75rem 3rem !important;
@@ -724,9 +722,7 @@ div.stButton > button:active {
     transform: translateY(-5px) scale(1.04) !important;
 }
 
-/* ══════════════════════
-   SIDEBAR
-══════════════════════ */
+/* ══ SIDEBAR ══ */
 section[data-testid="stSidebar"] {
     background: rgba(4,10,28,0.97) !important;
     border-right: 1px solid rgba(0,100,200,0.22) !important;
@@ -740,9 +736,7 @@ section[data-testid="stSidebar"] * { color: rgba(210,232,255,0.92) !important; }
     font-size: 0.9rem; text-align: center; margin-bottom: 6px;
 }
 
-/* ══════════════════════
-   HEADER BANNER
-══════════════════════ */
+/* ══ HEADER BANNER ══ */
 .header-banner {
     background: linear-gradient(135deg,rgba(0,60,180,0.65),rgba(0,120,200,0.45),rgba(0,80,160,0.65));
     border: 1px solid rgba(0,150,255,0.28); padding: 18px 28px;
@@ -752,9 +746,7 @@ section[data-testid="stSidebar"] * { color: rgba(210,232,255,0.92) !important; }
 .header-banner h2 { font-size:clamp(1.1rem,2.5vw,1.5rem) !important; font-weight:800 !important; margin:0 0 4px 0 !important; color:#fff !important; }
 .header-banner p  { margin:0 !important; color:rgba(195,228,255,0.9) !important; font-size:0.83rem !important; text-transform:uppercase !important; letter-spacing:0.06em !important; }
 
-/* ══════════════════════
-   METRIC CARDS
-══════════════════════ */
+/* ══ METRIC CARDS ══ */
 .metric-row { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
 .metric-card {
     background:rgba(0,40,120,0.3); border:1px solid rgba(0,120,255,0.22);
@@ -765,9 +757,7 @@ section[data-testid="stSidebar"] * { color: rgba(210,232,255,0.92) !important; }
 .metric-label { font-size:0.7rem; color:rgba(160,205,255,0.85); font-weight:700; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:3px; }
 .metric-value { font-size:1.3rem; font-weight:800; color:#fff; font-family:'JetBrains Mono',monospace !important; }
 
-/* ══════════════════════
-   REC CARDS
-══════════════════════ */
+/* ══ REC CARDS ══ */
 .rec-card { border-radius:11px; padding:13px 17px; margin-bottom:8px; transition:all 0.25s ease; }
 .rec-card:hover { transform:translateX(4px); }
 .rec-card.danger  { background:rgba(200,40,40,0.12);  border:1px solid rgba(200,40,40,0.25);  border-left:4px solid #ff4444; }
@@ -778,9 +768,7 @@ section[data-testid="stSidebar"] * { color: rgba(210,232,255,0.92) !important; }
 .rec-body  { font-size:0.81rem; color:rgba(210,232,255,0.85); line-height:1.55; }
 .rec-section-title { font-size:0.95rem; font-weight:800; color:rgba(100,210,255,0.95); letter-spacing:0.06em; text-transform:uppercase; margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid rgba(0,120,200,0.3); }
 
-/* ══════════════════════
-   SOIL BADGE
-══════════════════════ */
+/* ══ SOIL BADGE ══ */
 .soil-badge {
     display:inline-flex; align-items:center; gap:12px;
     background:linear-gradient(135deg,rgba(0,60,180,0.5),rgba(0,120,200,0.35));
@@ -791,9 +779,7 @@ section[data-testid="stSidebar"] * { color: rgba(210,232,255,0.92) !important; }
 .soil-badge-symbol { font-size:1.45rem; font-weight:900; color:#00d4ff; font-family:'JetBrains Mono',monospace !important; }
 .soil-badge-name   { font-size:0.9rem; font-weight:600; color:rgba(200,235,255,0.95); }
 
-/* ══════════════════════
-   HISTORY CARDS
-══════════════════════ */
+/* ══ HISTORY CARDS ══ */
 .hist-card {
     background:rgba(0,20,60,0.55); border:1px solid rgba(0,100,200,0.22);
     border-radius:13px; padding:16px 20px 12px 20px; margin-bottom:12px;
@@ -810,14 +796,10 @@ section[data-testid="stSidebar"] * { color: rgba(210,232,255,0.92) !important; }
     font-family:'JetBrains Mono',monospace !important;
 }
 
-/* ══════════════════════
-   CLASS SECTION
-══════════════════════ */
+/* ══ CLASS SECTION ══ */
 .class-section { background:rgba(0,40,100,0.38); border:1px solid rgba(0,140,255,0.28); border-radius:13px; padding:18px 22px; margin-bottom:14px; backdrop-filter:blur(12px); }
 
-/* ══════════════════════
-   LINK BUTTONS
-══════════════════════ */
+/* ══ LINK BUTTONS ══ */
 div[data-testid="stLinkButton"] > a {
     background: linear-gradient(135deg,rgba(0,100,255,0.75),rgba(0,60,185,0.85)) !important;
     color: #fff !important; border: 1px solid rgba(0,140,255,0.38) !important;
@@ -843,9 +825,7 @@ div[data-testid="stDownloadButton"] > button:hover {
     border-color: rgba(0,230,160,0.65) !important; color: #fff !important;
 }
 
-/* ══════════════════════
-   INPUTS
-══════════════════════ */
+/* ══ INPUTS ══ */
 div[data-testid="stTextInput"] input,
 div[data-testid="stNumberInput"] input,
 div[data-testid="stTextArea"] textarea {
@@ -868,27 +848,19 @@ div[data-testid="stTextArea"] label { color: rgba(200,228,255,0.95) !important; 
 div[data-testid="stSelectbox"] > div > div { background: rgba(0,20,60,0.55) !important; border: 1px solid rgba(0,100,200,0.35) !important; border-radius: 9px !important; color: #fff !important; }
 div[data-testid="stRadio"] label, div[data-testid="stRadio"] span { color: rgba(205,228,255,0.92) !important; }
 
-/* ══════════════════════
-   TABS
-══════════════════════ */
+/* ══ TABS ══ */
 div[data-testid="stTabs"] button { color:rgba(180,215,255,0.78) !important; font-weight:600 !important; border-radius:8px 8px 0 0 !important; transition:all 0.2s ease !important; }
 div[data-testid="stTabs"] button:hover { color:#fff !important; }
 div[data-testid="stTabs"] button[aria-selected="true"] { color:#fff !important; background:rgba(0,80,200,0.32) !important; border-bottom:2px solid rgba(0,190,255,0.75) !important; }
 
-/* ══════════════════════
-   SHARE SECTION
-══════════════════════ */
+/* ══ SHARE SECTION ══ */
 .share-section { background:rgba(0,30,80,0.55); border:1px solid rgba(0,120,200,0.28); border-radius:14px; padding:22px 26px; margin-top:24px; backdrop-filter:blur(16px); border-top:3px solid rgba(0,185,255,0.45); }
 
-/* ══════════════════════
-   CHAT
-══════════════════════ */
+/* ══ CHAT ══ */
 div[data-testid="stChatMessage"] { background:rgba(0,20,60,0.45) !important; border:1px solid rgba(0,100,200,0.22) !important; border-radius:13px !important; margin-bottom:8px !important; }
 div[data-testid="stChatMessage"] p { color:rgba(215,235,255,0.92) !important; }
 
-/* ══════════════════════
-   TEXT VISIBILITY
-══════════════════════ */
+/* ══ TEXT VISIBILITY ══ */
 .stMarkdown p,.stMarkdown li { color:rgba(205,228,255,0.9) !important; }
 .stMarkdown h1,.stMarkdown h2,.stMarkdown h3 { color:#fff !important; }
 .stMarkdown a { color:rgba(100,190,255,0.95) !important; }
@@ -936,7 +908,6 @@ for key, default in {
 # BACK BUTTON HELPER
 # --------------------------
 def show_back_button():
-    """Show a back button if there is navigation history."""
     if len(st.session_state.page_history) > 0:
         st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
         col1, col2, col3 = st.columns([1, 2, 1])
@@ -973,7 +944,6 @@ if not st.session_state.app_started:
     </div>
     """, unsafe_allow_html=True)
 
-    # Centered launch button — normal flow, no fixed positioning
     col_left, col_center, col_right = st.columns([2, 1, 2])
     with col_center:
         st.markdown('<div class="welcome-launch-btn">', unsafe_allow_html=True)
@@ -981,7 +951,7 @@ if not st.session_state.app_started:
             st.session_state.app_started = True
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
-    st.stop()  # ← prevent any other screen from flashing below
+    st.stop()
 
 
 # ==========================
@@ -991,11 +961,9 @@ elif not st.session_state.logged_in:
 
     st.markdown("<div style='height:30px'></div>", unsafe_allow_html=True)
 
-    # Use columns to center the form
     _, mid, _ = st.columns([1, 2, 1])
 
     with mid:
-        # ── Logo ──
         if _LOGO:
             st.markdown(
                 f'<div style="text-align:center;margin-bottom:10px;">'
@@ -1009,7 +977,6 @@ elif not st.session_state.logged_in:
         else:
             st.markdown('<div style="text-align:center;font-size:3.5rem;">🏛️</div>', unsafe_allow_html=True)
 
-        # ── Card wrapper (styling only, no widgets inside) ──
         if st.session_state.auth_screen == "login":
             st.markdown("""
             <div style="text-align:center;margin-bottom:4px;">
@@ -1081,7 +1048,7 @@ elif not st.session_state.logged_in:
                 st.session_state.auth_screen = "login"
                 st.rerun()
 
-    st.stop()  # ← prevent main app from flashing below auth screen
+    st.stop()
 
 
 # ==========================
@@ -1146,7 +1113,6 @@ else:
         ["🧪  Run Tests", "🕒  Test History", "🤖  AI Assistant"],
         index=0 if st.session_state.view_mode == "test" else (1 if st.session_state.view_mode == "history" else 2)
     )
-    # Track page history for back button
     new_mode = "test" if "Run" in nav else ("history" if "History" in nav else "ai")
     if new_mode != st.session_state.view_mode:
         st.session_state.page_history.append(st.session_state.view_mode)
@@ -1327,7 +1293,6 @@ else:
 
     # ==========================
     # FLOATING SCROLL-TO-TOP BTN
-    # (mobile WebView helper)
     # ==========================
     st.markdown("""
     <button onclick="window.scrollTo({top:0,behavior:'smooth'})"
