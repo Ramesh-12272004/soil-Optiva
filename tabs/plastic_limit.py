@@ -1,207 +1,270 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-from io import BytesIO, StringIO
+from io import BytesIO
 from docx import Document
 from docx.shared import Inches
+from datetime import datetime
 
-def run():
-    st.subheader("Liquid Limit by Cone Penetration Method (IS 2720: Part 5: 1985)")
 
-    # --- Procedure & Formulas ---
-    with st.expander("📝 Procedure & Formulas", expanded=True):
-        st.markdown("""
-### Test Procedure
-1. Take air-dried soil and pass it through a 425 µm sieve.
-2. Mix soil with water to form a uniform paste.
-3. Fill the cone penetration device with soil paste.
-4. Measure penetration (in mm) for several trials.
-5. Record weights:
-    - W1: Empty container
-    - W2: Container + wet soil
-    - W3: Container + dry soil
-6. Calculate water content and plot flow curve (water content vs penetration).
-7. Determine **Liquid Limit (LL)** at 20 mm penetration.
+PROCEDURE = """
+Objective:
+  To determine the Plastic Limit (PL) of fine-grained soil as per
+  IS 2720 (Part 5) – 1985.
 
-### Formulas Used
-**Water Content (%)**  
-w (%) = ((W2 - W3) / (W3 - W1)) * 100
+Apparatus Required:
+  - Glass plate (frosted / non-absorbent)
+  - Weighing balance (accuracy 0.01 g)
+  - Moisture content cans with lids
+  - Oven (105 °C – 110 °C)
+  - IS sieve 425 µm
+  - Wash bottle with distilled water
+  - Rod of 3 mm diameter (for reference)
 
-**Linear Regression for Flow Curve**  
-Water Content = a * Penetration + b
+Theory:
+  The Plastic Limit is the lowest water content at which soil can be
+  rolled into a 3 mm diameter thread without crumbling. It marks the
+  boundary between the plastic and semi-solid states.
 
-**Liquid Limit (LL)**  
-LL = Water Content at Penetration = 20 mm
-""")
+  Plasticity Index (PI) = LL – PL
+  PI indicates the range of water content over which soil behaves plastically.
 
-    # --- Helper function to calculate Moisture Content ---
-    def calculate_moisture_content(w1, w2, w3):
-        if w1==0.0 and w2==0.0 and w3==0.0: return 0.0
-        if not (w2 > w3 > w1): return np.nan
-        weight_of_water = w2 - w3
-        weight_of_dry_soil = w3 - w1
-        if weight_of_dry_soil <= 0: return np.nan
-        return (weight_of_water / weight_of_dry_soil) * 100
+Step-by-Step Procedure:
+  1. Pass air-dried soil through a 425 µm sieve; take about 20 g.
+  2. Mix thoroughly with distilled water until it becomes plastic.
+  3. Roll a small ball (~6 g) between the palms to a uniform ball.
+  4. Place the ball on the glass plate and roll with fingers to a
+     uniform thread of 3 mm diameter.
+  5. If the thread does not crumble, fold it, re-roll, and repeat
+     until it just crumbles at exactly 3 mm diameter.
+  6. Collect the crumbled pieces immediately into a moisture can.
+  7. Determine the water content of the crumbled thread.
+  8. Repeat with fresh soil (minimum 3 trials).
+  9. The average water content at crumbling = Plastic Limit.
 
-    # --- Number of Trials ---
-    if "cone_num_trials" not in st.session_state:
-        st.session_state.cone_num_trials = 4
-    num_trials = st.number_input(
-        "Number of Trials", min_value=3, max_value=10,
-        value=st.session_state.cone_num_trials
+Precautions:
+  - Rolling must be uniform, using the full length of the fingers.
+  - Crumbling must occur AT 3 mm, not before or after.
+  - Avoid excessive drying during rolling.
+  - At least 3 consistent trials are required.
+"""
+
+FORMULAS = """
+Water Content per trial (w%):
+  w (%) = [(W2 - W3) / (W3 - W1)] × 100
+
+  Where:
+    W1 = Mass of empty moisture can (g)
+    W2 = Mass of can + wet soil     (g)
+    W3 = Mass of can + dry soil     (g)
+
+Plastic Limit (PL):
+  PL = Average of water contents from all valid trials (%)
+
+Plasticity Index (PI):
+  PI = Liquid Limit (LL) – Plastic Limit (PL)
+
+Activity (A):
+  A = PI / (% clay fraction)  [if clay % is known]
+
+IS Classification based on PI:
+  PI < 7   → Non-plastic to slightly plastic
+  7 ≤ PI < 17 → Moderately plastic
+  PI ≥ 17  → Highly plastic
+"""
+
+
+def _calc_wc(w1, w2, w3):
+    if w2 <= w3 or w3 <= w1:
+        return np.nan
+    return (w2 - w3) / (w3 - w1) * 100
+
+
+def _generate_report(df, pl, ll_input, pi, procedure, formulas):
+    doc = Document()
+    doc.add_heading("Plastic Limit Test Report", 0)
+    doc.add_paragraph("Reference Standard: IS 2720 (Part 5) – 1985")
+    doc.add_paragraph(f"Date: {datetime.now().strftime('%d-%m-%Y')}")
+
+    doc.add_heading("Objective", 1)
+    doc.add_paragraph(
+        "To determine the Plastic Limit (PL) of fine-grained soil and "
+        "calculate the Plasticity Index (PI)."
     )
 
-    # --- Initialize trial inputs ---
-    if "cone_trial_inputs" not in st.session_state:
-        st.session_state.cone_trial_inputs = [
-            {"penetration":0.0,"w1":0.0,"w2":0.0,"w3":0.0,"water_content":0.0} 
-            for _ in range(num_trials)
-        ]
-    if len(st.session_state.cone_trial_inputs) != num_trials:
-        new_inputs=[]
-        for i in range(num_trials):
-            if i < len(st.session_state.cone_trial_inputs):
-                new_inputs.append(st.session_state.cone_trial_inputs[i])
-            else:
-                new_inputs.append({"penetration":0.0,"w1":0.0,"w2":0.0,"w3":0.0,"water_content":0.0})
-        st.session_state.cone_trial_inputs = new_inputs
-        st.session_state.cone_num_trials = num_trials
+    doc.add_heading("Test Procedure", 1)
+    for line in procedure.strip().split("\n"):
+        if line.strip():
+            doc.add_paragraph(line.strip())
 
-    # --- Input Fields ---
-    for i in range(num_trials):
-        st.markdown(f"### Trial {i+1}")
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.session_state.cone_trial_inputs[i]["penetration"] = st.number_input(
-                f"Penetration (mm) [{i+1}]", min_value=0.0,
-                value=st.session_state.cone_trial_inputs[i]["penetration"], format="%.2f"
-            )
-        with col2:
-            st.session_state.cone_trial_inputs[i]["w1"] = st.number_input(
-                f"W1 (Empty) [{i+1}]", min_value=0.0,
-                value=st.session_state.cone_trial_inputs[i]["w1"], format="%.2f"
-            )
-        with col3:
-            st.session_state.cone_trial_inputs[i]["w2"] = st.number_input(
-                f"W2 (Wet + Container) [{i+1}]", min_value=0.0,
-                value=st.session_state.cone_trial_inputs[i]["w2"], format="%.2f"
-            )
-        with col4:
-            st.session_state.cone_trial_inputs[i]["w3"] = st.number_input(
-                f"W3 (Dry + Container) [{i+1}]", min_value=0.0,
-                value=st.session_state.cone_trial_inputs[i]["w3"], format="%.2f"
-            )
+    doc.add_heading("Formulas Used", 1)
+    for line in formulas.strip().split("\n"):
+        if line.strip():
+            doc.add_paragraph(line.strip())
 
-        # Calculate water content
-        w1_val = st.session_state.cone_trial_inputs[i]["w1"]
-        w2_val = st.session_state.cone_trial_inputs[i]["w2"]
-        w3_val = st.session_state.cone_trial_inputs[i]["w3"]
-        calculated_wc = calculate_moisture_content(w1_val, w2_val, w3_val)
-        st.session_state.cone_trial_inputs[i]["water_content"] = calculated_wc
-        if np.isnan(calculated_wc):
-            st.error(f"Trial {i+1} Water Content: Invalid input.")
+    doc.add_heading("Observation Table", 1)
+    table = doc.add_table(rows=1, cols=len(df.columns))
+    table.style = "Table Grid"
+    for i, col in enumerate(df.columns):
+        table.rows[0].cells[i].text = str(col)
+    for _, row in df.iterrows():
+        cells = table.add_row().cells
+        for j, val in enumerate(row):
+            cells[j].text = str(round(val, 3) if isinstance(val, float) else val)
+
+    doc.add_heading("Results", 1)
+    doc.add_paragraph(f"Plastic Limit (PL)       = {pl:.2f} %")
+    if ll_input > 0:
+        doc.add_paragraph(f"Liquid Limit (LL)        = {ll_input:.2f} %")
+        doc.add_paragraph(f"Plasticity Index (PI)    = {pi:.2f} %")
+
+    doc.add_heading("Conclusion", 1)
+    if ll_input > 0:
+        if pi < 7:
+            plas = "non-plastic to slightly plastic"
+        elif pi < 17:
+            plas = "moderately plastic"
         else:
-            st.info(f"Trial {i+1} Water Content: **{calculated_wc:.2f}%**")
-
-    # --- Save Inputs CSV ---
-    if st.button("💾 Save Inputs"):
-        df_save = pd.DataFrame(st.session_state.cone_trial_inputs)
-        df_save.insert(0, "Trial", range(1,len(df_save)+1))
-        buffer = StringIO()
-        df_save.to_csv(buffer,index=False)
-        buffer.seek(0)
-        st.download_button(
-            label="📥 Download Input Data as CSV",
-            data=buffer.getvalue(),
-            file_name="cone_penetration_inputs.csv",
-            mime="text/csv"
+            plas = "highly plastic"
+        doc.add_paragraph(
+            f"The Plastic Limit is {pl:.2f}% and the Plasticity Index is {pi:.2f}%, "
+            f"indicating a {plas} soil."
+        )
+    else:
+        doc.add_paragraph(
+            f"The Plastic Limit of the soil sample is {pl:.2f}%."
         )
 
-    # --- Calculate Liquid Limit ---
-    if st.button("Calculate Liquid Limit"):
-        df_all = pd.DataFrame(st.session_state.cone_trial_inputs)
-        df_all.insert(0,"Trial", range(1,len(df_all)+1))
-        df_valid = df_all[(df_all["penetration"]>0) & (~df_all["water_content"].isna()) & (df_all["water_content"]>0)].copy()
-        if df_valid.empty or len(df_valid)<2:
-            st.error("Enter at least two valid data points with non-zero penetration and calculable water content.")
+    buf = BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return buf
+
+
+def run():
+    st.subheader("🟤 Plastic Limit Test (IS 2720 Part 5 : 1985)")
+
+    with st.expander("📘 View Detailed Procedure"):
+        st.markdown(PROCEDURE)
+    with st.expander("📐 View Formulas"):
+        st.markdown(FORMULAS)
+
+    # ── Session state ──
+    if "pl_num_trials" not in st.session_state:
+        st.session_state.pl_num_trials = 3
+    if "pl_inputs" not in st.session_state:
+        st.session_state.pl_inputs = [
+            {"w1": 0.0, "w2": 0.0, "w3": 0.0}
+            for _ in range(3)
+        ]
+    if "pl_ll" not in st.session_state:
+        st.session_state.pl_ll = 0.0
+
+    num_trials = st.number_input(
+        "Number of Trials (min 3)", min_value=3, max_value=10,
+        value=st.session_state.pl_num_trials, step=1
+    )
+    while len(st.session_state.pl_inputs) < num_trials:
+        st.session_state.pl_inputs.append({"w1": 0.0, "w2": 0.0, "w3": 0.0})
+    st.session_state.pl_inputs = st.session_state.pl_inputs[:num_trials]
+    st.session_state.pl_num_trials = num_trials
+
+    st.markdown("### ⚖️ Moisture Content Readings")
+    for i in range(num_trials):
+        st.markdown(f"#### Trial {i + 1}")
+        c1, c2, c3 = st.columns(3)
+        inp = st.session_state.pl_inputs[i]
+        inp["w1"] = c1.number_input(f"W1 – Empty Can (g)", value=inp["w1"],
+                                    min_value=0.0, format="%.3f", key=f"pl_w1_{i}")
+        inp["w2"] = c2.number_input(f"W2 – Wet Soil+Can (g)", value=inp["w2"],
+                                    min_value=0.0, format="%.3f", key=f"pl_w2_{i}")
+        inp["w3"] = c3.number_input(f"W3 – Dry Soil+Can (g)", value=inp["w3"],
+                                    min_value=0.0, format="%.3f", key=f"pl_w3_{i}")
+
+        wc = _calc_wc(inp["w1"], inp["w2"], inp["w3"])
+        if np.isnan(wc):
+            if not (inp["w1"] == inp["w2"] == inp["w3"] == 0.0):
+                st.warning(f"Trial {i + 1}: Invalid weights.")
+        else:
+            st.info(f"Trial {i + 1} Water Content = **{wc:.2f}%**")
+
+    st.markdown("---")
+    st.markdown("### 📌 Optional – Enter Liquid Limit for PI Calculation")
+    st.session_state.pl_ll = st.number_input(
+        "Liquid Limit LL (%)", value=st.session_state.pl_ll,
+        min_value=0.0, format="%.2f", key="pl_ll_input"
+    )
+
+    if st.button("🔄 Reset All Inputs"):
+        st.session_state.pl_inputs = [{"w1": 0.0, "w2": 0.0, "w3": 0.0} for _ in range(num_trials)]
+        st.session_state.pl_ll = 0.0
+        st.rerun()
+
+    if st.button("📊 Calculate Plastic Limit"):
+        rows = []
+        wc_list = []
+        for i, inp in enumerate(st.session_state.pl_inputs[:num_trials]):
+            wc = _calc_wc(inp["w1"], inp["w2"], inp["w3"])
+            rows.append({
+                "Trial":             i + 1,
+                "W1 – Empty Can (g)":     inp["w1"],
+                "W2 – Wet Soil+Can (g)":  inp["w2"],
+                "W3 – Dry Soil+Can (g)":  inp["w3"],
+                "Water Content (%)":  round(wc, 2) if not np.isnan(wc) else np.nan,
+            })
+            if not np.isnan(wc):
+                wc_list.append(wc)
+
+        df = pd.DataFrame(rows)
+
+        if len(wc_list) < 2:
+            st.error("At least 2 valid trials required.")
             return None
-        try:
-            x_data = df_valid["penetration"].astype(float)
-            y_data = df_valid["water_content"].astype(float)
-            if len(np.unique(x_data))<2:
-                st.error("At least two distinct penetration readings required.")
-                return None
-            coeffs = np.polyfit(x_data,y_data,1)
-            poly = np.poly1d(coeffs)
-            liquid_limit = poly(20) # LL at 20mm
 
-            # Display trial data
-            st.markdown("### Trial Data & Water Content")
-            st.dataframe(df_all.round(2), use_container_width=True)
+        pl   = float(np.mean(wc_list))
+        ll   = float(st.session_state.pl_ll)
+        pi   = ll - pl if ll > 0 else None
 
-            # Plot flow curve
-            fig,ax=plt.subplots(figsize=(8,5))
-            ax.scatter(x_data,y_data,color='blue',label='Observed Data')
-            x_plot = np.linspace(min(x_data)-5,max(x_data)+5,100)
-            y_plot = poly(x_plot)
-            ax.plot(x_plot,y_plot,color='green',linestyle='--',label='Fitted Curve')
-            ax.axvline(20,color='red',linestyle=':',label='20 mm Penetration')
-            ax.axhline(liquid_limit,color='orange',linestyle=':',label=f'LL = {liquid_limit:.2f}%')
-            ax.plot(20,liquid_limit,'ro',markersize=8,label='Liquid Limit Point')
-            ax.set_xlabel("Penetration (mm)")
-            ax.set_ylabel("Water Content (%)")
-            ax.set_title("Cone Penetration Method: Flow Curve")
-            ax.legend(); ax.grid(True)
-            st.pyplot(fig)
+        st.markdown("### 📊 Observation Table")
+        st.dataframe(df.round(3), use_container_width=True)
 
-            img_buf = BytesIO()
-            fig.savefig(img_buf,format='png',bbox_inches='tight'); img_buf.seek(0)
-            plt.close(fig)
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Plastic Limit (PL)", f"{pl:.2f}%")
+        if ll > 0 and pi is not None:
+            c2.metric("Liquid Limit (LL)", f"{ll:.2f}%")
+            c3.metric("Plasticity Index (PI)", f"{pi:.2f}%")
 
-            st.markdown("### Result")
-            st.success(f"Liquid Limit (Cone Penetration Method) = {liquid_limit:.2f}%")
+            if pi < 7:
+                plas_desc = "Non-plastic to Slightly Plastic"
+                st.info(f"🏷️ Plasticity: **{plas_desc}** (PI = {pi:.2f}%)")
+            elif pi < 17:
+                plas_desc = "Moderately Plastic"
+                st.warning(f"🏷️ Plasticity: **{plas_desc}** (PI = {pi:.2f}%)")
+            else:
+                plas_desc = "Highly Plastic"
+                st.error(f"🏷️ Plasticity: **{plas_desc}** (PI = {pi:.2f}%)")
+        else:
+            pi = 0.0
+            plas_desc = "N/A (LL not provided)"
+            st.info(f"Plastic Limit = {pl:.2f}%. Enter LL above to get PI.")
 
-            # Soil Classification
-            st.markdown("### Soil Classification Based on Liquid Limit")
-            if liquid_limit<35: soil_class="Low Plasticity Soil"; st.info(soil_class)
-            elif 35<=liquid_limit<=50: soil_class="Intermediate Plasticity Soil"; st.warning(soil_class)
-            else: soil_class="High Plasticity Soil"; st.success(soil_class)
+        # Word report
+        report_buf = _generate_report(df, pl, ll, pi if pi else 0.0, PROCEDURE, FORMULAS)
+        st.download_button(
+            "⬇️ Download Word Report",
+            data=report_buf,
+            file_name="Plastic_Limit_Report.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
 
-            # --- Generate Word Report ---
-            if st.button("📄 Generate Word Report"):
-                doc = Document()
-                doc.add_heading("Liquid Limit Test Report (Cone Penetration Method)",0)
-                doc.add_paragraph(f"Estimated Liquid Limit (LL) = {liquid_limit:.2f}%")
-                doc.add_paragraph("Remarks: Determined at 20 mm penetration from flow curve.")
-                doc.add_heading("Trial Data",level=1)
-                table=doc.add_table(rows=1,cols=len(df_all.columns))
-                hdr_cells=table.rows[0].cells
-                for idx,col in enumerate(df_all.columns): hdr_cells[idx].text=col
-                for i in range(len(df_all)):
-                    row_cells=table.add_row().cells
-                    for j,col in enumerate(df_all.columns): row_cells[j].text=str(df_all[col].iloc[i])
-                doc.add_heading("Flow Curve",level=1)
-                doc.add_picture(img_buf,width=Inches(6))
-                buffer_word=BytesIO(); doc.save(buffer_word); buffer_word.seek(0)
-                st.download_button("📥 Download Word Report",data=buffer_word.getvalue(),
-                                   file_name="Cone_Penetration_Liquid_Limit_Report.docx",
-                                   mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-
-            return {
-                "Input Data": df_all,
-                "Valid Data Used for Fit": df_valid,
-                "Flow Curve Graph": img_buf,
-                "Liquid Limit (LL)": f"{liquid_limit:.2f}%",
-                "Soil Classification": soil_class,
-                "Remarks": "Liquid Limit determined at 20mm penetration."
-            }
-
-        except np.linalg.LinAlgError:
-            st.error("Cannot fit curve: check that penetration values are distinct.")
-            return None
-        except Exception as e:
-            st.error(f"Unexpected error: {e}")
-            return None
+        return {
+            "procedure":            PROCEDURE,
+            "formulas":             FORMULAS,
+            "data":                 df,
+            "Plastic Limit PL (%)": round(pl, 2),
+            "Liquid Limit LL (%)":  round(ll, 2) if ll > 0 else None,
+            "Plasticity Index PI (%)": round(pi, 2) if pi else None,
+            "Plasticity Class":     plas_desc,
+        }
 
     return None

@@ -1,252 +1,277 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
-from io import BytesIO, StringIO
 import math
+import pandas as pd
+from io import BytesIO
+from docx import Document
+from datetime import datetime
 
-def run():
-    st.subheader("🌀 Vane Shear Test (IS 2720 Part 30:1980)") # Ref: IS 2720 Part 30:1980
-    st.markdown("""
-    This test determines the **undrained shear strength ($S_u$)** of soft cohesive soils
-    by measuring the torque required to rotate a vane within the soil.
-    It can also be used to evaluate **Sensitivity**.
 
-    **Shear Strength (S) formula:**
-    $$
-    S = \\frac{T}{K_v} \\quad \\text{where} \\quad K_v = \\pi D^2 H \\left( \\frac{1}{2} + \\frac{D}{6H} \\right)
-    $$
-    - $T$: Torque (kg-cm)
-    - $K_v$: Vane constant (cm³)
-    - $D$: Diameter of vane (cm)
-    - $H$: Height of vane (cm)
-    """)
+PROCEDURE = """
+Objective:
+  To determine the undrained shear strength (Su) and sensitivity of soft
+  cohesive soils using the vane shear test as per IS 2720 (Part 30) – 1980.
 
-    # --- Session State Initialization for Inputs ---
-    if "vs_vane_D" not in st.session_state:
-        st.session_state.vs_vane_D = 1.2 # cm (12mm)
-    if "vs_vane_H" not in st.session_state:
-        st.session_state.vs_vane_H = 2.0 # cm (20mm)
-    if "vs_spring_constant" not in st.session_state:
-        st.session_state.vs_spring_constant = 1.0 # kg-cm/degree (example)
-    if "vs_num_trials" not in st.session_state:
-        st.session_state.vs_num_trials = 2 # For undisturbed and remoulded
+Apparatus Required:
+  - Vane shear apparatus (field or lab type)
+  - Four-bladed vane (rectangular: D ≈ 12 mm, H ≈ 25 mm for lab; larger for field)
+  - Torque measuring device (spring balance or torque wrench) with graduated scale
+  - Stopwatch
 
-    # Initialize data for each trial
-    if "vs_trials_data" not in st.session_state:
-        st.session_state.vs_trials_data = []
+Theory:
+  A four-bladed vane is pushed into the soil and rotated at a slow, constant
+  rate (≈ 0.1°/s). The torque T required to shear the cylindrical surface
+  (top, bottom, and perimeter of the vane) provides the undrained shear strength.
 
-    # --- General Parameters ---
-    st.markdown("### 📏 Vane Dimensions & Apparatus Constant")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.session_state.vs_vane_D = st.number_input(
-            "Vane Diameter (D) in cm",
-            min_value=0.1, value=st.session_state.vs_vane_D, format="%.2f", key="vs_vane_D_input"
-        )
-        st.session_state.vs_vane_H = st.number_input(
-            "Vane Height (H) in cm",
-            min_value=0.1, value=st.session_state.vs_vane_H, format="%.2f", key="vs_vane_H_input"
-        )
-    with col2:
-        st.session_state.vs_spring_constant = st.number_input(
-            "Spring Constant (kg-cm/degree)",
-            min_value=0.001, value=st.session_state.vs_spring_constant, format="%.3f", key="vs_spring_const_input"
-        )
-        # Calculate Vane Constant (Kv)
-        if st.session_state.vs_vane_H > 0:
-            Kv = (math.pi * (st.session_state.vs_vane_D**2) * st.session_state.vs_vane_H / 2) + \
-                 (math.pi * (st.session_state.vs_vane_D**3) / 6)
-            st.info(f"Calculated Vane Constant ($K_v$): **{Kv:.3f} cm³**")
-        else:
-            Kv = 0.0
-            st.warning("Vane Height must be > 0 to calculate Vane Constant.")
+  If both undisturbed and remoulded strengths are measured, the ratio gives
+  the Sensitivity:
+    S_t = S_u(undisturbed) / S_u(remoulded)
 
-    # --- Number of Trials ---
-    num_trials = st.number_input(
-        "Number of Trials (e.g., 1 for Undisturbed, 2 for Undisturbed & Remoulded)",
-        min_value=1, max_value=3,
-        value=st.session_state.vs_num_trials,
-        step=1, key="vs_num_trials_input"
+  Sensitivity Classification (IS):
+    S_t < 2      → Insensitive
+    2 – 4        → Normal sensitive
+    4 – 8        → Sensitive
+    8 – 16       → Extra sensitive
+    > 16         → Quick clay
+
+Step-by-Step Procedure:
+  1. Measure the vane diameter D and height H precisely.
+  2. Determine the spring constant of the torquemeter device.
+  3. Insert the vane into the undisturbed soil at the required depth without
+     pre-shearing; apply light vertical pressure only.
+  4. Rotate the vane at ≈ 0.1°/s (about 6°/min); record the angle of twist
+     at failure (maximum torque).
+  5. Continue rotating rapidly (≥ 5 turns) to fully remould the soil.
+  6. Re-measure at the same rate to obtain remoulded torque.
+  7. Repeat at a minimum of 2–3 depths or locations.
+
+Precautions:
+  - Insert the vane without rotation to minimise disturbance.
+  - Begin the test within 5 minutes of insertion.
+  - Maintain a constant angular rotation rate.
+  - Avoid surcharging the test area before testing.
+"""
+
+FORMULAS = """
+Vane Constant (K_v):
+  K_v = π × D² × H × (1/2 + D/(6H))    [cm³]
+
+Torque:
+  T = Spring Constant × (Final Angle – Initial Angle)    [kg·cm]
+
+Shear Strength:
+  S_u = T / K_v    [kg/cm²]
+
+Sensitivity:
+  S_t = S_u (Undisturbed) / S_u (Remoulded)
+
+Where:
+  D = Diameter of vane (cm)
+  H = Height of vane (cm)
+  Spring Constant in kg·cm/degree
+"""
+
+
+def _sensitivity_class(st_val):
+    if st_val < 2:
+        return "Insensitive"
+    elif st_val < 4:
+        return "Normal Sensitive"
+    elif st_val < 8:
+        return "Sensitive"
+    elif st_val < 16:
+        return "Extra Sensitive"
+    else:
+        return "Quick Clay"
+
+
+def _generate_report(D, H, Kv, spring_const, df, avg_su, sensitivity_val, sens_class, procedure, formulas):
+    doc = Document()
+    doc.add_heading("Vane Shear Test Report", 0)
+    doc.add_paragraph("Reference Standard: IS 2720 (Part 30) – 1980")
+    doc.add_paragraph(f"Date: {datetime.now().strftime('%d-%m-%Y')}")
+
+    doc.add_heading("Objective", 1)
+    doc.add_paragraph(
+        "To determine the undrained shear strength and sensitivity of soft "
+        "cohesive soil using the vane shear test."
     )
 
-    # Reinitialize/resize trials_data based on num_trials
-    if num_trials != st.session_state.vs_num_trials:
-        st.session_state.vs_num_trials = num_trials
-        st.session_state.vs_trials_data = [] # Clear existing data if count changes
-        # Ensure a template is available for new trials
-        for i in range(num_trials):
-            st.session_state.vs_trials_data.append({
-                "Type": "Undisturbed" if i == 0 else "Remoulded",
-                "Initial Reading (Deg)": 0.0,
-                "Final Reading (Deg)": 0.0
-            })
-    
-    # Initialize vs_trials_data if it's empty on first run
-    if not st.session_state.vs_trials_data:
-        for i in range(num_trials):
-            st.session_state.vs_trials_data.append({
-                "Type": "Undisturbed" if i == 0 else "Remoulded",
-                "Initial Reading (Deg)": 0.0,
-                "Final Reading (Deg)": 0.0
-            })
-    # Ensure list size matches current num_trials
-    st.session_state.vs_trials_data = st.session_state.vs_trials_data[:num_trials]
+    doc.add_heading("Test Procedure", 1)
+    for line in procedure.strip().split("\n"):
+        if line.strip():
+            doc.add_paragraph(line.strip())
+
+    doc.add_heading("Formulas Used", 1)
+    for line in formulas.strip().split("\n"):
+        if line.strip():
+            doc.add_paragraph(line.strip())
+
+    doc.add_paragraph(f"Vane Diameter D = {D:.2f} cm")
+    doc.add_paragraph(f"Vane Height   H = {H:.2f} cm")
+    doc.add_paragraph(f"Vane Constant Kv = {Kv:.4f} cm³")
+    doc.add_paragraph(f"Spring Constant = {spring_const:.4f} kg·cm/degree")
+
+    doc.add_heading("Results Table", 1)
+    table = doc.add_table(rows=1, cols=len(df.columns))
+    table.style = "Table Grid"
+    for i, col in enumerate(df.columns):
+        table.rows[0].cells[i].text = str(col)
+    for _, row in df.iterrows():
+        cells = table.add_row().cells
+        for j, val in enumerate(row):
+            cells[j].text = f"{val:.4f}" if isinstance(val, float) else str(val)
+
+    doc.add_heading("Summary", 1)
+    doc.add_paragraph(f"Average Shear Strength Su = {avg_su:.4f} kg/cm²")
+    if sensitivity_val != "N/A":
+        doc.add_paragraph(f"Sensitivity St = {sensitivity_val:.2f}  ({sens_class})")
+
+    doc.add_heading("Conclusion", 1)
+    conc = (
+        f"The undrained shear strength of the soil is {avg_su:.4f} kg/cm²."
+    )
+    if sensitivity_val != "N/A":
+        conc += f" The sensitivity is {sensitivity_val:.2f} ({sens_class})."
+    doc.add_paragraph(conc)
+
+    buf = BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return buf
 
 
-    # --- Trial Data Input ---
+def run():
+    st.subheader("🌀 Vane Shear Test (IS 2720 Part 30 : 1980)")
+
+    with st.expander("📘 View Detailed Procedure"):
+        st.markdown(PROCEDURE)
+    with st.expander("📐 View Formulas"):
+        st.markdown(FORMULAS)
+
+    if "vs_res" not in st.session_state:
+        st.session_state.vs_res = None
+
+    # ── Apparatus ──
+    st.markdown("### 📏 Vane Dimensions & Spring Constant")
+    c1, c2, c3 = st.columns(3)
+    D   = c1.number_input("Diameter D (cm)", value=1.20, min_value=0.01, format="%.3f", key="vs_D")
+    H   = c2.number_input("Height H (cm)",   value=2.40, min_value=0.01, format="%.3f", key="vs_H")
+    sc  = c3.number_input("Spring Constant (kg·cm/degree)", value=0.001, min_value=0.0001, format="%.4f", key="vs_sc")
+
+    Kv = math.pi * D ** 2 * H * (0.5 + D / (6 * H))
+    st.info(f"Vane Constant K_v = **{Kv:.4f} cm³**")
+
+    # ── Trial inputs ──
+    num_trials = st.number_input("Number of Trials", min_value=1, max_value=6, value=2, step=1, key="vs_nt")
+
+    if "vs_inputs" not in st.session_state or len(st.session_state.vs_inputs) != num_trials:
+        st.session_state.vs_inputs = [
+            {"type": "Undisturbed", "init_deg": 0.0, "fail_deg": 0.0}
+            for _ in range(num_trials)
+        ]
+
     st.markdown("### 📋 Angle of Twist Readings")
     for i in range(num_trials):
-        st.markdown(f"#### Trial {i+1} ({st.session_state.vs_trials_data[i]['Type']})")
-        col_type, col_readings = st.columns([1, 2])
-        with col_type:
-            st.session_state.vs_trials_data[i]["Type"] = st.selectbox(
-                f"Sample Type - Trial {i+1}",
-                options=["Undisturbed", "Remoulded"],
-                index=0 if i == 0 else 1, # Default to Undisturbed for first, Remoulded for others
-                key=f"vs_sample_type_{i}"
-            )
-        with col_readings:
-            st.session_state.vs_trials_data[i]["Initial Reading (Deg)"] = st.number_input(
-                f"Initial Reading (Degrees) [{i+1}]",
-                min_value=0.0, value=st.session_state.vs_trials_data[i]["Initial Reading (Deg)"],
-                key=f"vs_initial_deg_{i}"
-            )
-            st.session_state.vs_trials_data[i]["Final Reading (Deg)"] = st.number_input(
-                f"Final Reading (Degrees) [{i+1}]",
-                min_value=0.0, value=st.session_state.vs_trials_data[i]["Final Reading (Deg)"],
-                key=f"vs_final_deg_{i}"
-            )
-
-    # --- Save Inputs Button ---
-    if st.button("💾 Save Inputs", key="save_vs_inputs_button"):
-        input_data_for_save = {
-            "Vane Diameter (cm)": st.session_state.vs_vane_D,
-            "Vane Height (cm)": st.session_state.vs_vane_H,
-            "Spring Constant (kg-cm/degree)": st.session_state.vs_spring_constant,
-            "Trial Data": st.session_state.vs_trials_data
-        }
-        
-        buffer = StringIO()
-        buffer.write("--- General Parameters ---\n")
-        buffer.write(f"Vane Diameter (cm),{input_data_for_save['Vane Diameter (cm)']}\n")
-        buffer.write(f"Vane Height (cm),{input_data_for_save['Vane Height (cm)']}\n")
-        buffer.write(f"Spring Constant (kg-cm/degree),{input_data_for_save['Spring Constant (kg-cm/degree)']}\n")
-        buffer.write("\n--- Trial Data ---\n")
-        pd.DataFrame(input_data_for_save["Trial Data"]).to_csv(buffer, index=False)
-        buffer.seek(0)
-
-        st.download_button(
-            label="📥 Download Input Data as CSV",
-            data=buffer.getvalue(),
-            file_name="vane_shear_inputs.csv",
-            mime="text/csv"
+        st.markdown(f"#### Trial {i + 1}")
+        c1, c2, c3 = st.columns(3)
+        inp = st.session_state.vs_inputs[i]
+        inp["type"] = c1.selectbox(
+            "Sample Type", ["Undisturbed", "Remoulded"],
+            index=0 if inp["type"] == "Undisturbed" else 1,
+            key=f"vs_type_{i}"
+        )
+        inp["init_deg"] = c2.number_input(
+            "Initial Reading (°)", value=inp["init_deg"],
+            min_value=0.0, format="%.2f", key=f"vs_init_{i}"
+        )
+        inp["fail_deg"] = c3.number_input(
+            "Failure Reading (°)", value=inp["fail_deg"],
+            min_value=0.0, format="%.2f", key=f"vs_fail_{i}"
         )
 
-    # --- Calculate Shear Strength Button ---
-    if st.button("Calculate Shear Strength", key="calculate_vs_results_button"):
-        calculated_trials = []
-        undisturbed_strength = None
-        remoulded_strength = None
+    if st.button("🔄 Reset"):
+        st.session_state.vs_inputs = [
+            {"type": "Undisturbed", "init_deg": 0.0, "fail_deg": 0.0}
+            for _ in range(num_trials)
+        ]
+        st.session_state.vs_res = None
+        st.rerun()
 
-        if Kv <= 0:
-            st.error("Calculated Vane Constant is zero or negative. Check Vane Diameter and Height.")
-            return None
-        if st.session_state.vs_spring_constant <= 0:
-            st.error("Spring Constant must be greater than zero.")
-            return None
+    if st.button("📊 Calculate Shear Strength"):
+        rows = []
+        su_undisturbed = None
+        su_remoulded   = None
 
-        for i, trial_input in enumerate(st.session_state.vs_trials_data):
-            initial_deg = trial_input["Initial Reading (Deg)"]
-            final_deg = trial_input["Final Reading (Deg)"]
-            sample_type = trial_input["Type"]
-
-            if final_deg < initial_deg:
-                st.warning(f"Trial {i+1} ({sample_type}): Final reading is less than initial reading. Skipping calculation for this trial.")
+        for i, inp in enumerate(st.session_state.vs_inputs[:num_trials]):
+            diff = inp["fail_deg"] - inp["init_deg"]
+            if diff <= 0:
+                st.warning(f"Trial {i + 1}: Failure reading must be greater than initial reading.")
                 continue
+            T  = sc * diff
+            Su = T / Kv if Kv > 0 else 0.0
+            rows.append({
+                "Trial":               i + 1,
+                "Type":                inp["type"],
+                "Initial (°)":         round(inp["init_deg"], 2),
+                "Failure (°)":         round(inp["fail_deg"], 2),
+                "Δθ (°)":              round(diff, 2),
+                "Torque T (kg·cm)":    round(T, 4),
+                "Su (kg/cm²)":         round(Su, 5),
+            })
+            if inp["type"] == "Undisturbed":
+                su_undisturbed = Su
+            elif inp["type"] == "Remoulded":
+                su_remoulded = Su
 
-            try:
-                # Difference in degrees
-                diff_deg = final_deg - initial_deg
-                # Torque T (kg-cm)
-                T = st.session_state.vs_spring_constant * diff_deg
-                # Shear Strength S (kg/cm²)
-                S = T / Kv
-
-                calculated_trials.append({
-                    "Trial": i + 1,
-                    "Type": sample_type,
-                    "Initial Reading (Deg)": initial_deg,
-                    "Final Reading (Deg)": final_deg,
-                    "Difference (Deg)": round(diff_deg, 2),
-                    "Torque (kg-cm)": round(T, 3),
-                    "Shear Strength (kg/cm²)": round(S, 3)
-                })
-
-                if sample_type == "Undisturbed":
-                    undisturbed_strength = S
-                elif sample_type == "Remoulded":
-                    remoulded_strength = S
-
-            except Exception as e:
-                st.error(f"Trial {i+1} ({sample_type}): An error occurred during calculation: {e}. Check inputs.")
-                continue
-
-        if not calculated_trials:
-            st.error("No valid trials processed. Please ensure all inputs are correctly filled.")
+        if not rows:
+            st.error("No valid trials calculated.")
             return None
 
-        results_df = pd.DataFrame(calculated_trials)
-        st.markdown("### 📋 Shear Strength Calculation Results")
-        st.dataframe(results_df, use_container_width=True)
+        df = pd.DataFrame(rows)
+        avg_su = float(df["Su (kg/cm²)"].mean())
 
-        avg_shear_strength = results_df["Shear Strength (kg/cm²)"].mean()
-        st.success(f"**Average Shear Strength (S)**: {avg_shear_strength:.3f} kg/cm²")
+        sensitivity_val = "N/A"
+        sens_class      = "N/A"
+        if su_undisturbed and su_remoulded and su_remoulded > 0:
+            sensitivity_val = su_undisturbed / su_remoulded
+            sens_class      = _sensitivity_class(sensitivity_val)
 
-        # --- Sensitivity Calculation ---
-        sensitivity = "N/A"
-        if undisturbed_strength is not None and remoulded_strength is not None and remoulded_strength > 0:
-            sensitivity = undisturbed_strength / remoulded_strength
-            st.markdown("### 🧪 Sensitivity")
-            st.info(f"**Sensitivity (S_t)** = Undisturbed Strength / Remoulded Strength = {sensitivity:.2f}")
+        st.markdown("### 📋 Results Table")
+        st.dataframe(df, use_container_width=True)
 
-            # Interpret Sensitivity
-            if sensitivity < 1:
-                st.warning("Sensitivity < 1: Indicates remoulded strength is higher than undisturbed, which is unusual. Check inputs.")
-            elif 1 <= sensitivity <= 2:
-                st.info("Sensitivity: **Insensitive**")
-            elif 2 < sensitivity <= 4:
-                st.info("Sensitivity: **Normal Sensitive**")
-            elif 4 < sensitivity <= 8:
-                st.warning("Sensitivity: **Sensitive**")
-            elif 8 < sensitivity <= 16:
-                st.error("Sensitivity: **Extra Sensitive**")
-            else:
-                st.error("Sensitivity: **Quick Clay**")
-        else:
-            st.info("To calculate Sensitivity, perform at least one Undisturbed and one Remoulded test.")
-            sensitivity = "Requires Undisturbed and Remoulded strengths"
+        c1, c2 = st.columns(2)
+        c1.metric("Average Su (kg/cm²)", f"{avg_su:.5f}")
+        if sensitivity_val != "N/A":
+            c2.metric("Sensitivity St", f"{sensitivity_val:.2f}")
+            st.info(f"🏷️ Sensitivity Class: **{sens_class}**")
 
-        # --- General Remarks ---
-        st.markdown("### 📝 General Remarks")
-        remarks = """
-        1. The Vane Shear Test is highly suitable for soft, cohesive soils where undisturbed samples are difficult to obtain or handle.
-        2. It provides the undrained shear strength directly.
-        3. The test is relatively quick and economical.
-        4. Sensitivity is a crucial parameter for evaluating the loss of strength upon remoulding, especially important for clays.
-        """
-        st.info(remarks)
-
-        # Return results for the main app to collect
-        return {
-            "General Parameters": pd.DataFrame({
-                "Parameter": ["Vane Diameter (cm)", "Vane Height (cm)", "Spring Constant (kg-cm/degree)", "Calculated Vane Constant (cm³)"],
-                "Value": [st.session_state.vs_vane_D, st.session_state.vs_vane_H, st.session_state.vs_spring_constant, round(Kv, 3)]
-            }),
-            "Raw Trial Inputs": pd.DataFrame(st.session_state.vs_trials_data).insert(0, "Trial No.", range(1, len(st.session_state.vs_trials_data) + 1)),
-            "Calculated Shear Strengths": results_df,
-            "Average Shear Strength (kg/cm²)": f"{avg_shear_strength:.3f}",
-            "Sensitivity (S_t)": str(sensitivity),
-            "Remarks": remarks
+        st.session_state.vs_res = {
+            "df": df, "avg_su": avg_su,
+            "sensitivity_val": sensitivity_val,
+            "sens_class": sens_class,
         }
 
-    return None # Default return if calculation button is not pressed
+        report_buf = _generate_report(
+            D, H, Kv, sc, df, avg_su,
+            sensitivity_val, sens_class,
+            PROCEDURE, FORMULAS
+        )
+        st.download_button(
+            "⬇️ Download Word Report",
+            data=report_buf,
+            file_name="Vane_Shear_Report.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+
+        result = {
+            "procedure":            PROCEDURE,
+            "formulas":             FORMULAS,
+            "data":                 df,
+            "Average Su (kg/cm2)":  round(avg_su, 5),
+        }
+        if sensitivity_val != "N/A":
+            result["Sensitivity St"]      = round(sensitivity_val, 2)
+            result["Sensitivity Class"]   = sens_class
+        return result
+
+    return None
