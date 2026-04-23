@@ -3,3 +3,5 @@ __pycache__/
 history/
 
 tabs/__pycache__/
+
+users.json
