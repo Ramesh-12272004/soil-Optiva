@@ -87,17 +87,26 @@ _defaults = {
     "last_result": None,
     "last_test_name": None,
     "page_history": [],
+    "selected_test": "Sieve Analysis",
 }
 for k, v in _defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
 # --------------------------
-# BASE CSS — injected once, every screen
+# BASE CSS
 # --------------------------
 def inject_base_css():
     st.markdown("""
 <style>
+/* ══ MOBILE SCROLL FIX — prevents pull-to-refresh in WebView APK ══ */
+html, body {
+    overscroll-behavior: none !important;
+    overscroll-behavior-y: none !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-x pan-y !important;
+}
+
 @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap');
 
 html, body, [class*="css"], .stApp, .stMarkdown,
@@ -124,7 +133,7 @@ button, input, textarea, select {
 [data-testid="manage-app-button"],
 .stDeployButton { display: none !important; }
 
-/* SIDEBAR ALWAYS OPEN */
+/* SIDEBAR */
 [data-testid="stSidebar"] {
     background-color: rgba(4,10,28,0.98) !important;
     border-right: 1px solid rgba(0,100,200,0.25) !important;
@@ -147,12 +156,61 @@ button, input, textarea, select {
 }
 [data-testid="collapsedControl"],
 [data-testid="stSidebarCollapseButton"],
-button[data-testid="baseButton-header"] {
-    display: none !important;
-}
-
+button[data-testid="baseButton-header"] { display: none !important; }
 [data-testid="stSidebar"] * { color: rgba(210,232,255,0.92) !important; }
 
+/* SIDEBAR EXPANDER — collapsible test categories */
+[data-testid="stSidebar"] [data-testid="stExpander"] {
+    background: rgba(0,30,80,0.5) !important;
+    border: 1px solid rgba(0,100,200,0.3) !important;
+    border-radius: 10px !important;
+    margin-bottom: 6px !important;
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary,
+[data-testid="stSidebar"] [data-testid="stExpander"] button {
+    color: rgba(180,220,255,0.95) !important;
+    font-weight: 700 !important;
+    font-size: 0.85rem !important;
+    background: rgba(0,50,130,0.4) !important;
+    border-radius: 10px !important;
+    padding: 8px 12px !important;
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary p {
+    color: rgba(180,220,255,0.95) !important;
+    font-weight: 700 !important;
+    display: inline !important;
+}
+
+/* TEST SELECTION BUTTONS IN SIDEBAR */
+.test-btn button {
+    background: transparent !important;
+    border: 1px solid rgba(0,100,200,0.2) !important;
+    border-radius: 8px !important;
+    color: rgba(190,220,255,0.88) !important;
+    font-size: 0.8rem !important;
+    font-weight: 600 !important;
+    padding: 0.35rem 0.7rem !important;
+    text-align: left !important;
+    width: 100% !important;
+    margin-bottom: 3px !important;
+    box-shadow: none !important;
+    transition: all 0.18s ease !important;
+}
+.test-btn button:hover {
+    background: rgba(0,80,200,0.3) !important;
+    border-color: rgba(0,160,255,0.45) !important;
+    color: #fff !important;
+    transform: translateX(3px) !important;
+    box-shadow: none !important;
+}
+.test-btn-active button {
+    background: rgba(0,100,255,0.35) !important;
+    border: 1px solid rgba(0,180,255,0.55) !important;
+    color: #fff !important;
+    border-left: 3px solid #00aaff !important;
+}
+
+/* INPUTS */
 .stTextInput input, .stNumberInput input, .stTextArea textarea {
     background: rgba(0,20,60,0.7) !important;
     border: 1px solid rgba(0,100,200,0.45) !important;
@@ -166,13 +224,13 @@ button[data-testid="baseButton-header"] {
     outline: none !important;
 }
 .stTextInput label, .stNumberInput label,
-.stSelectbox label, .stTextArea label,
-.stRadio label {
+.stSelectbox label, .stTextArea label, .stRadio label {
     color: rgba(200,228,255,0.95) !important;
     font-weight: 600 !important;
     font-size: 0.87rem !important;
 }
 
+/* BUTTONS */
 .stButton > button {
     background: linear-gradient(135deg, #0064ff, #003cc8) !important;
     color: #ffffff !important;
@@ -190,13 +248,11 @@ button[data-testid="baseButton-header"] {
     box-shadow: 0 8px 24px rgba(0,130,255,0.45) !important;
     transform: translateY(-2px) !important;
 }
-
 .stDownloadButton > button {
     background: linear-gradient(135deg, #00a878, #006650) !important;
     border-color: rgba(0,200,140,0.5) !important;
     color: #fff !important;
 }
-
 [data-testid="stLinkButton"] a {
     background: linear-gradient(135deg, rgba(0,100,255,0.8), rgba(0,60,185,0.9)) !important;
     color: #fff !important;
@@ -219,6 +275,7 @@ button[data-testid="baseButton-header"] {
     color: #e8f4ff !important;
 }
 
+/* EXPANDER (main content) */
 [data-testid="stExpander"] {
     background: rgba(0,20,60,0.4) !important;
     border: 1px solid rgba(0,100,200,0.3) !important;
@@ -233,7 +290,6 @@ button[data-testid="baseButton-header"] {
     border-radius: 12px !important;
     list-style: none !important;
 }
-[data-testid="stExpander"] summary::-webkit-details-marker { display: none !important; }
 [data-testid="stExpander"] summary p {
     display: inline !important;
     color: rgba(205,228,255,0.95) !important;
@@ -248,7 +304,6 @@ button[data-testid="baseButton-header"] {
     border: 1px solid rgba(0,100,200,0.25) !important;
     border-radius: 10px !important;
 }
-
 [data-testid="stChatMessage"] {
     background: rgba(0,20,60,0.45) !important;
     border: 1px solid rgba(0,100,200,0.22) !important;
@@ -269,9 +324,9 @@ strong, b { color: #ffffff !important; }
     border: 1px solid rgba(0,100,200,0.3) !important;
     color: rgba(180,220,255,0.9) !important;
 }
-
 [data-testid="stAlert"] p { color: #fff !important; }
 
+/* CUSTOM COMPONENTS */
 .greet-bar {
     background: linear-gradient(135deg, rgba(0,100,255,0.4), rgba(0,180,200,0.3));
     border: 1px solid rgba(0,140,255,0.45);
@@ -283,7 +338,6 @@ strong, b { color: #ffffff !important; }
     text-align: center;
     margin-bottom: 8px;
 }
-
 .header-banner {
     background: linear-gradient(135deg, rgba(0,55,175,0.7), rgba(0,115,195,0.5), rgba(0,75,160,0.7));
     border: 1px solid rgba(0,150,255,0.3);
@@ -423,7 +477,7 @@ def ai_chatbot(key_prefix="main"):
     ]
     for i, (label, prompt) in enumerate(quick_prompts):
         with qcols[i % 2]:
-            if st.button(label, key=f"qp_{key_prefix}_{i}", width='stretch'):
+            if st.button(label, key=f"qp_{key_prefix}_{i}"):
                 st.session_state[chat_key].append(("You", label))
                 st.session_state[chat_key].append(("Bot", get_ai_response(prompt)))
                 st.rerun()
@@ -434,7 +488,7 @@ def ai_chatbot(key_prefix="main"):
     with col_in:
         user_input = st.text_input("Ask a question", placeholder="Ask about soil tests, IS codes…", key=input_key, label_visibility="collapsed")
     with col_btn:
-        if st.button("Ask →", key=ask_key, width='stretch'):
+        if st.button("Ask →", key=ask_key):
             if user_input and user_input.strip():
                 st.session_state[chat_key].append(("You", user_input.strip()))
                 st.session_state[chat_key].append(("Bot", get_ai_response(user_input)))
@@ -524,17 +578,17 @@ def share_buttons(test_name, result_dict, doc_bytes=None, inside_expander=False)
 
     st.markdown("#### 📤 Share Results")
     c1, c2, c3, c4 = st.columns(4)
-    with c1: st.link_button("💬 WhatsApp",  f"https://api.whatsapp.com/send?text={enc_t}", width='stretch')
-    with c2: st.link_button("✈️ Telegram",  f"https://t.me/share/url?url=&text={enc_t}", width='stretch')
-    with c3: st.link_button("📧 Email",     f"mailto:?subject={urllib.parse.quote('ANITS Report – ' + test_name)}&body={urllib.parse.quote(text.replace('*', ''))}", width='stretch')
-    with c4: st.link_button("🐦 Twitter/X", f"https://twitter.com/intent/tweet?text={enc_t}", width='stretch')
+    with c1: st.link_button("💬 WhatsApp",  f"https://api.whatsapp.com/send?text={enc_t}", use_container_width=True)
+    with c2: st.link_button("✈️ Telegram",  f"https://t.me/share/url?url=&text={enc_t}", use_container_width=True)
+    with c3: st.link_button("📧 Email",     f"mailto:?subject={urllib.parse.quote('ANITS Report – ' + test_name)}&body={urllib.parse.quote(text.replace('*', ''))}", use_container_width=True)
+    with c4: st.link_button("🐦 Twitter/X", f"https://twitter.com/intent/tweet?text={enc_t}", use_container_width=True)
 
     st.markdown("#### 🔍 Search & AI Assistants")
     cg, cs, cgpt, ccop = st.columns(4)
-    with cg:   st.link_button("🔍 Google",  f"https://www.google.com/search?q={search_q}", width='stretch')
-    with cs:   st.link_button("📚 Scholar", f"https://scholar.google.com/scholar?q={search_q}", width='stretch')
-    with cgpt: st.link_button("🟢 ChatGPT", f"https://chat.openai.com/?q={enc_ai}", width='stretch')
-    with ccop: st.link_button("🔵 Copilot", "https://copilot.microsoft.com/", width='stretch')
+    with cg:   st.link_button("🔍 Google",  f"https://www.google.com/search?q={search_q}", use_container_width=True)
+    with cs:   st.link_button("📚 Scholar", f"https://scholar.google.com/scholar?q={search_q}", use_container_width=True)
+    with cgpt: st.link_button("🟢 ChatGPT", f"https://chat.openai.com/?q={enc_ai}", use_container_width=True)
+    with ccop: st.link_button("🔵 Copilot", "https://copilot.microsoft.com/", use_container_width=True)
 
     st.text_area("📋 Copilot Prompt — copy & paste:", value=ai_p, height=120,
                  key=f"cpta_{abs(hash(test_name + str(id(result_dict))))}", label_visibility="visible")
@@ -544,7 +598,7 @@ def share_buttons(test_name, result_dict, doc_bytes=None, inside_expander=False)
             data=doc_bytes,
             file_name=f"ANITS_{test_name.replace(' ', '_')}_Report.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            width='stretch',
+            use_container_width=True,
         )
 
 # --------------------------
@@ -610,7 +664,7 @@ def show_back_button():
     if st.session_state.page_history:
         _, col, _ = st.columns([1, 2, 1])
         with col:
-            if st.button("⬅️  Back to Previous Page", key="back_btn_main", width='stretch'):
+            if st.button("⬅️  Back to Previous Page", key="back_btn_main", use_container_width=True):
                 st.session_state.view_mode = st.session_state.page_history.pop()
                 st.rerun()
 
@@ -654,7 +708,7 @@ if not st.session_state.app_started:
     _, mid, _ = st.columns([1.8, 1, 1.8])
     with mid:
         st.markdown('<div class="launch-wrap">', unsafe_allow_html=True)
-        if st.button("🚀  Launch App →", key="launch_btn", width='stretch'):
+        if st.button("🚀  Launch App →", key="launch_btn", use_container_width=True):
             st.session_state.app_started = True
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
@@ -684,7 +738,7 @@ elif not st.session_state.logged_in:
             email    = st.text_input("📧  Email address", key="login_email", placeholder="you@example.com")
             password = st.text_input("🔒  Password", type="password", key="login_pass", placeholder="Enter your password")
             st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-            if st.button("🔐  Sign In", width='stretch', key="signin_btn"):
+            if st.button("🔐  Sign In", use_container_width=True, key="signin_btn"):
                 if not email or not password:
                     st.error("Please fill in all fields.")
                 else:
@@ -698,7 +752,7 @@ elif not st.session_state.logged_in:
                     else:
                         st.error(msg)
             st.markdown("<div style='text-align:center;color:rgba(150,190,230,0.55);font-size:0.8rem;margin:12px 0;'>── or ──</div>", unsafe_allow_html=True)
-            if st.button("✏️  Create a New Account", width='stretch', key="goto_signup"):
+            if st.button("✏️  Create a New Account", use_container_width=True, key="goto_signup"):
                 st.session_state.auth_screen = "signup"
                 st.rerun()
         else:
@@ -709,7 +763,7 @@ elif not st.session_state.logged_in:
             password  = st.text_input("🔒  Password",         type="password", key="reg_pass",  placeholder="Min. 6 characters")
             confirm   = st.text_input("🔒  Confirm Password", type="password", key="reg_pass2", placeholder="Re-enter password")
             st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-            if st.button("🎓  Create Account", width='stretch', key="create_btn"):
+            if st.button("🎓  Create Account", use_container_width=True, key="create_btn"):
                 if not all([full_name, email, password, confirm]):
                     st.error("Please fill in all fields.")
                 elif len(password) < 6:
@@ -725,7 +779,7 @@ elif not st.session_state.logged_in:
                     else:
                         st.error(msg)
             st.markdown("<div style='text-align:center;color:rgba(150,190,230,0.55);font-size:0.8rem;margin:12px 0;'>── or ──</div>", unsafe_allow_html=True)
-            if st.button("🔐  Sign In Instead", width='stretch', key="goto_login"):
+            if st.button("🔐  Sign In Instead", use_container_width=True, key="goto_login"):
                 st.session_state.auth_screen = "login"
                 st.rerun()
 
@@ -769,6 +823,31 @@ else:
     except ImportError:
         tests = {"Demo Test": None}
 
+    # ── TEST CATEGORIES (collapsible accordion in sidebar) ──
+    test_categories = {
+        "🔬 Classification": [
+            "Sieve Analysis",
+            "Liquid Limit (Casagrande)",
+            "Liquid Limit (Cone)",
+            "Plastic Limit",
+            "Specific Gravity",
+        ],
+        "🏗️ Strength": [
+            "Direct Shear",
+            "UCS Test",
+            "Triaxial Test",
+            "Vane Shear",
+            "CBR Test",
+        ],
+        "💧 Permeability & Compaction": [
+            "Constant Head",
+            "Variable Head",
+            "Light Compaction",
+            "Core Cutter",
+            "Consolidation Test",
+        ],
+    }
+
     # ── SIDEBAR ──
     try:
         st.sidebar.image("assets/anits_logo.png", width=90)
@@ -784,19 +863,47 @@ else:
         unsafe_allow_html=True)
     st.sidebar.markdown("---")
 
+    # Navigation
     _nav_idx = {"test": 0, "history": 1, "ai": 2}.get(st.session_state.view_mode, 0)
-    nav = st.sidebar.radio("Navigation", ["🧪  Run Tests", "🕒  Test History", "🤖  AI Assistant"], index=_nav_idx)
+    nav = st.sidebar.radio("Navigation", ["🧪  Run Tests", "🕒  History", "🤖  AI Assistant"], index=_nav_idx)
     new_mode = "test" if "Run" in nav else ("history" if "History" in nav else "ai")
     if new_mode != st.session_state.view_mode:
         st.session_state.page_history.append(st.session_state.view_mode)
         st.session_state.view_mode = new_mode
 
-    selected_test = selected_module = None
+    # ── COLLAPSIBLE TEST CATEGORIES ──
+    selected_test = st.session_state.selected_test
+    selected_module = None
+
     if st.session_state.view_mode == "test":
         st.sidebar.markdown("---")
-        st.sidebar.subheader("Select Test")
-        selected_test   = st.sidebar.radio("Select a Test", list(tests.keys()), label_visibility="collapsed")
-        selected_module = tests[selected_test]
+        st.sidebar.markdown(
+            "<p style='color:rgba(160,210,255,0.8);font-size:0.75rem;font-weight:700;"
+            "text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;'>"
+            "📂 Select Test</p>",
+            unsafe_allow_html=True
+        )
+        for category, test_list in test_categories.items():
+            # Auto-expand the category that contains the currently selected test
+            is_open = selected_test in test_list
+            with st.sidebar.expander(category, expanded=is_open):
+                for test_name in test_list:
+                    is_active = (test_name == selected_test)
+                    css_class = "test-btn-active" if is_active else "test-btn"
+                    st.markdown(f'<div class="{css_class}">', unsafe_allow_html=True)
+                    if st.button(
+                        f"{'▶ ' if is_active else ''}{test_name}",
+                        key=f"test_btn_{test_name}",
+                        use_container_width=True,
+                    ):
+                        st.session_state.selected_test = test_name
+                        st.session_state.last_result = None
+                        st.session_state.last_test_name = None
+                        st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+        selected_test = st.session_state.selected_test
+        selected_module = tests.get(selected_test)
 
     st.sidebar.markdown("---")
     if st.session_state.completed_tests:
@@ -809,9 +916,10 @@ else:
             data=build_all_tests_docx(st.session_state.completed_tests),
             file_name="ANITS_All_Tests_Report.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True,
         )
 
-    if st.sidebar.button("🚪  Logout", width='stretch'):
+    if st.sidebar.button("🚪  Logout", use_container_width=True):
         for k in list(st.session_state.keys()):
             del st.session_state[k]
         st.rerun()
@@ -881,7 +989,7 @@ else:
                         for label, records in df_entries.items():
                             try:
                                 st.markdown(f"**{label}**")
-                                st.dataframe(pd.DataFrame(records), width='stretch')
+                                st.dataframe(pd.DataFrame(records), use_container_width=True)
                             except Exception:
                                 pass
 
@@ -890,6 +998,12 @@ else:
 
     # ── TEST VIEW ──
     else:
+        # Show current test name as subheader
+        st.markdown(
+            f"<h3 style='color:#fff;margin-bottom:4px;'>🧪 {selected_test}</h3>",
+            unsafe_allow_html=True
+        )
+
         result = None
         if selected_module is not None:
             result = selected_module.run()
@@ -929,6 +1043,7 @@ else:
             share_buttons(selected_test, res, doc_bytes=build_single_test_docx(selected_test, res))
             st.markdown('</div>', unsafe_allow_html=True)
 
+    # ── SCROLL TO TOP ──
     st.markdown("""
     <button onclick="window.scrollTo({top:0,behavior:'smooth'})"
         style="position:fixed;bottom:24px;right:18px;z-index:9999;
